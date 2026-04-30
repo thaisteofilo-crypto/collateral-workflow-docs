@@ -25,9 +25,9 @@ export function WorkflowHeader() {
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <h1
           style={{
-            fontSize: 40,
+            fontSize: 56,
             fontWeight: 500,
-            lineHeight: 1.1,
+            lineHeight: 1.05,
             letterSpacing: "-0.03em",
             color: "var(--text-primary)",
           }}
@@ -36,9 +36,9 @@ export function WorkflowHeader() {
         </h1>
         <h2
           style={{
-            fontSize: 40,
+            fontSize: 56,
             fontWeight: 500,
-            lineHeight: 1.1,
+            lineHeight: 1.05,
             letterSpacing: "-0.03em",
             color: "var(--text-tertiary)",
           }}
@@ -50,10 +50,10 @@ export function WorkflowHeader() {
       {/* Description */}
       <p
         style={{
-          fontSize: 15,
+          fontSize: 17,
           color: "var(--text-secondary)",
-          lineHeight: 1.7,
-          maxWidth: 480,
+          lineHeight: 1.6,
+          maxWidth: 560,
         }}
       >
         Documentação do fluxo de criação de capas para o blog da Collateral.

@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+.vercel
+
+# Heavy assets — deployed via vercel CLI, not tracked in git
+public/templates/*.psd

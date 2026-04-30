@@ -9,7 +9,12 @@ const resources = [
   {
     title: "Fluxo no Figma",
     description: "Arquivo de design",
-    url: "https://www.figma.com/design/fo5kZcQj576gZIYYPz3dVJ/Collateral---Blog?node-id=2279-2&t=QDUVAd3wZjRdusf3-1",
+    url: "https://www.figma.com/design/9BbFSbF4QwNIHiB4cFA2zO/Collateral---Ane--c%C3%B3pia-?node-id=2279-2&p=f&t=GtiniPJa6svA7nxo-0",
+  },
+  {
+    title: "Assistente Gemini",
+    description: "Resumos e conceitos",
+    url: "https://gemini.google.com/gem/1qC_d2IRBh8Jnp_Rb02PyI6BKZHdqtnAz?usp=sharing",
   },
   {
     title: "Pinterest",
@@ -79,7 +84,7 @@ export function ResourceLinks() {
           <ArrowOutwardLineIcon style={{ width: 16, height: 16 }} />
         </a>
         <a
-          href="https://www.figma.com/design/fo5kZcQj576gZIYYPz3dVJ/Collateral---Blog?node-id=2279-2&t=QDUVAd3wZjRdusf3-1"
+          href="https://www.figma.com/design/9BbFSbF4QwNIHiB4cFA2zO/Collateral---Ane--c%C3%B3pia-?node-id=2279-2&p=f&t=GtiniPJa6svA7nxo-0"
           target="_blank"
           rel="noopener noreferrer"
           className="pill-button"
