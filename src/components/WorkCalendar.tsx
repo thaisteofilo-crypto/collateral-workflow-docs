@@ -134,8 +134,30 @@ export function WorkCalendar() {
         ]);
         if (cancelled) return;
         if (pendingWrites.current > 0) return;
+
+        let paidSet = new Set(paid);
+
+        if (initial) {
+          // One-shot: Abril/2026 estava pago só no localStorage antes do KV sync
+          // e foi sobrescrito pelo servidor vazio. Restaura uma vez por browser.
+          const flag = "collateral.paidmonths.bootstrap.v1";
+          if (!localStorage.getItem(flag)) {
+            if (paidSet.has("2026-04")) {
+              localStorage.setItem(flag, "1");
+            } else {
+              try {
+                const months = await postPaidMonth("2026-04", "add");
+                paidSet = new Set(months);
+                localStorage.setItem(flag, "1");
+              } catch {
+                // tenta de novo no próximo mount
+              }
+            }
+          }
+        }
+
         setWorkdays(new Set(days));
-        setPaidMonths(new Set(paid));
+        setPaidMonths(paidSet);
         setSyncStatus("online");
       } catch (err) {
         if (cancelled) return;
