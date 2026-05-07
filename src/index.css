@@ -759,6 +759,39 @@ a {
 .payment-toggle.is-paid:hover {
   background: rgba(226, 233, 156, 0.2);
 }
+.payment-toggle.is-readonly {
+  cursor: default;
+  opacity: 0.7;
+}
+.payment-toggle.is-readonly:hover {
+  background: var(--surface-overlay);
+  color: var(--text-secondary);
+  border-color: var(--border-default);
+}
+.payment-toggle.is-readonly.is-paid:hover {
+  background: rgba(226, 233, 156, 0.12);
+  color: #E2E99C;
+  border-color: rgba(226, 233, 156, 0.3);
+}
+
+.admin-toggle {
+  background: transparent;
+  border: 1px solid var(--border-default);
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 500;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.admin-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
 
 .payment-summary {
   display: grid;
@@ -1666,6 +1699,20 @@ a {
 .cal-cell--worked:hover:not(.cal-cell--empty) {
   background: rgba(119, 197, 213, 0.2);
   border-color: var(--accent);
+  color: var(--accent);
+}
+.cal-cell--locked {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.cal-cell--locked:hover:not(.cal-cell--empty) {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+.cal-cell--locked.cal-cell--worked:hover:not(.cal-cell--empty) {
+  background: var(--accent-muted);
+  border-color: rgba(119, 197, 213, 0.3);
   color: var(--accent);
 }
 .cal-nav {

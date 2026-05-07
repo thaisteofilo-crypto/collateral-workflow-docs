@@ -6,6 +6,8 @@ import {
 
 const STORAGE_KEY = "collateral.workdays.v1";
 const PAID_KEY = "collateral.paidmonths.v1";
+const ADMIN_FLAG = "collateral.admin.v1";
+const ADMIN_PASSWORD = "0505adm";
 
 const MONTHLY_SALARY = 2100;
 const DAYS_PER_MONTH = 20;
@@ -13,6 +15,22 @@ const COVERS_PER_DAY = 2;
 const DAILY_RATE = MONTHLY_SALARY / DAYS_PER_MONTH;
 
 const POLL_INTERVAL_MS = 5000;
+
+function isMonthClosed(year: number, month: number): boolean {
+  const now = new Date();
+  return (
+    year < now.getFullYear() ||
+    (year === now.getFullYear() && month < now.getMonth())
+  );
+}
+
+function loadAdmin(): boolean {
+  try {
+    return localStorage.getItem(ADMIN_FLAG) === "ok";
+  } catch {
+    return false;
+  }
+}
 
 const BRL = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -106,6 +124,31 @@ export function WorkCalendar() {
   const [syncStatus, setSyncStatus] = useState<
     "idle" | "syncing" | "online" | "offline"
   >("idle");
+  const [isAdmin, setIsAdmin] = useState<boolean>(loadAdmin);
+
+  function unlockAdmin() {
+    const input = window.prompt("Senha admin:");
+    if (input == null) return;
+    if (input.trim() === ADMIN_PASSWORD) {
+      try {
+        localStorage.setItem(ADMIN_FLAG, "ok");
+      } catch {
+        // ignore
+      }
+      setIsAdmin(true);
+    } else {
+      window.alert("Senha incorreta");
+    }
+  }
+
+  function lockAdmin() {
+    try {
+      localStorage.removeItem(ADMIN_FLAG);
+    } catch {
+      // ignore
+    }
+    setIsAdmin(false);
+  }
 
   // Track in-flight writes so polling doesn't clobber pending changes
   const pendingWrites = useRef(0);
@@ -215,6 +258,7 @@ export function WorkCalendar() {
   const totalCount = workdays.size;
 
   async function toggle(day: number) {
+    if (isMonthClosed(viewYear, viewMonth)) return;
     const key = toKey(viewYear, viewMonth, day);
     const isWorked = workdays.has(key);
     const action: "add" | "remove" = isWorked ? "remove" : "add";
@@ -248,6 +292,7 @@ export function WorkCalendar() {
   }
 
   async function togglePaid(monthKey: string) {
+    if (!isAdmin) return;
     const isPaid = paidMonths.has(monthKey);
     const action: "add" | "remove" = isPaid ? "remove" : "add";
 
@@ -397,14 +442,17 @@ export function WorkCalendar() {
               d === today.getDate() &&
               viewMonth === today.getMonth() &&
               viewYear === today.getFullYear();
+            const closed = isMonthClosed(viewYear, viewMonth);
             return (
               <button
                 key={i}
                 type="button"
                 onClick={() => toggle(d)}
+                disabled={closed}
+                title={closed ? "Mês fechado — não editável" : undefined}
                 className={`cal-cell${isWorked ? " cal-cell--worked" : ""}${
                   isToday ? " cal-cell--today" : ""
-                }`}
+                }${closed ? " cal-cell--locked" : ""}`}
               >
                 {d}
               </button>
@@ -424,8 +472,8 @@ export function WorkCalendar() {
           }}
         >
           <span>
-            Clique em um dia para marcar como trabalhado. Sincronizado entre
-            todos os acessos.
+            Clique em um dia para marcar como trabalhado. Meses passados ficam
+            travados.
           </span>
           <span
             style={{
@@ -493,18 +541,38 @@ export function WorkCalendar() {
           </div>
 
           <div className="step-card" style={{ gap: 10 }}>
-            <span
+            <div
               style={{
-                fontSize: 11,
-                fontWeight: 600,
-                textTransform: "uppercase",
-                letterSpacing: "0.12em",
-                color: "var(--text-tertiary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
                 marginBottom: 4,
               }}
             >
-              Por mês
-            </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.12em",
+                  color: "var(--text-tertiary)",
+                }}
+              >
+                Por mês
+              </span>
+              <button
+                type="button"
+                onClick={isAdmin ? lockAdmin : unlockAdmin}
+                className="admin-toggle"
+                title={
+                  isAdmin
+                    ? "Travar (sair do modo admin)"
+                    : "Destravar pagamento (modo admin)"
+                }
+              >
+                {isAdmin ? "Travar pagamento" : "Modo admin"}
+              </button>
+            </div>
             {monthlyBreakdown.map((m) => {
               const isCurrent =
                 m.year === viewYear && m.month === viewMonth;
@@ -532,16 +600,29 @@ export function WorkCalendar() {
                   <span className="month-row-value">
                     {BRL.format(m.earnings)}
                   </span>
-                  <button
-                    type="button"
-                    className={`payment-toggle${
-                      m.paid ? " is-paid" : ""
-                    }`}
-                    onClick={() => togglePaid(m.key)}
-                    title={m.paid ? "Marcar como pendente" : "Marcar como pago"}
-                  >
-                    {m.paid ? "✓ Pago" : "Pendente"}
-                  </button>
+                  {isAdmin ? (
+                    <button
+                      type="button"
+                      className={`payment-toggle${
+                        m.paid ? " is-paid" : ""
+                      }`}
+                      onClick={() => togglePaid(m.key)}
+                      title={
+                        m.paid ? "Marcar como pendente" : "Marcar como pago"
+                      }
+                    >
+                      {m.paid ? "✓ Pago" : "Pendente"}
+                    </button>
+                  ) : (
+                    <span
+                      className={`payment-toggle is-readonly${
+                        m.paid ? " is-paid" : ""
+                      }`}
+                      title="Apenas modo admin pode alterar"
+                    >
+                      {m.paid ? "✓ Pago" : "Pendente"}
+                    </span>
+                  )}
                 </div>
               );
             })}
