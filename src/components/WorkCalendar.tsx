@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowBackIosNewLineIcon,
   ArrowForwardIosLineIcon,
@@ -11,6 +11,8 @@ const MONTHLY_SALARY = 2100;
 const DAYS_PER_MONTH = 20;
 const COVERS_PER_DAY = 2;
 const DAILY_RATE = MONTHLY_SALARY / DAYS_PER_MONTH;
+
+const POLL_INTERVAL_MS = 5000;
 
 const BRL = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -37,29 +39,9 @@ function toKey(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-function loadWorkdays(): Set<string> {
+function loadCache(key: string): Set<string> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return new Set();
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return new Set(parsed);
-    return new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function saveWorkdays(set: Set<string>) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(set)));
-  } catch {
-    // ignore
-  }
-}
-
-function loadPaidMonths(): Set<string> {
-  try {
-    const raw = localStorage.getItem(PAID_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? new Set(parsed) : new Set();
@@ -68,39 +50,109 @@ function loadPaidMonths(): Set<string> {
   }
 }
 
-function savePaidMonths(set: Set<string>) {
+function saveCache(key: string, set: Set<string>) {
   try {
-    localStorage.setItem(PAID_KEY, JSON.stringify(Array.from(set)));
+    localStorage.setItem(key, JSON.stringify(Array.from(set)));
   } catch {
     // ignore
   }
+}
+
+async function fetchWorkdays(signal?: AbortSignal): Promise<string[]> {
+  const res = await fetch("/api/workdays", { signal, cache: "no-store" });
+  if (!res.ok) throw new Error("Falha ao carregar dias");
+  return (await res.json()) as string[];
+}
+
+async function postWorkday(day: string, action: "add" | "remove"): Promise<string[]> {
+  const res = await fetch("/api/workdays", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ day, action }),
+  });
+  if (!res.ok) throw new Error("Falha ao salvar dia");
+  return (await res.json()) as string[];
+}
+
+async function fetchPaidMonths(signal?: AbortSignal): Promise<string[]> {
+  const res = await fetch("/api/paid-months", { signal, cache: "no-store" });
+  if (!res.ok) throw new Error("Falha ao carregar meses pagos");
+  return (await res.json()) as string[];
+}
+
+async function postPaidMonth(
+  month: string,
+  action: "add" | "remove"
+): Promise<string[]> {
+  const res = await fetch("/api/paid-months", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ month, action }),
+  });
+  if (!res.ok) throw new Error("Falha ao salvar status de pagamento");
+  return (await res.json()) as string[];
 }
 
 export function WorkCalendar() {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
-  const [workdays, setWorkdays] = useState<Set<string>>(() => loadWorkdays());
-  const [paidMonths, setPaidMonths] = useState<Set<string>>(() =>
-    loadPaidMonths()
+  const [workdays, setWorkdays] = useState<Set<string>>(() =>
+    loadCache(STORAGE_KEY)
   );
+  const [paidMonths, setPaidMonths] = useState<Set<string>>(() =>
+    loadCache(PAID_KEY)
+  );
+  const [syncStatus, setSyncStatus] = useState<
+    "idle" | "syncing" | "online" | "offline"
+  >("idle");
 
+  // Track in-flight writes so polling doesn't clobber pending changes
+  const pendingWrites = useRef(0);
+
+  // Cache locally whenever state changes
   useEffect(() => {
-    saveWorkdays(workdays);
+    saveCache(STORAGE_KEY, workdays);
   }, [workdays]);
 
   useEffect(() => {
-    savePaidMonths(paidMonths);
+    saveCache(PAID_KEY, paidMonths);
   }, [paidMonths]);
 
-  function togglePaid(monthKey: string) {
-    setPaidMonths((prev) => {
-      const next = new Set(prev);
-      if (next.has(monthKey)) next.delete(monthKey);
-      else next.add(monthKey);
-      return next;
-    });
-  }
+  // Initial load + polling
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+
+    async function syncFromServer(initial: boolean) {
+      if (pendingWrites.current > 0) return;
+      try {
+        if (initial) setSyncStatus("syncing");
+        const [days, paid] = await Promise.all([
+          fetchWorkdays(controller.signal),
+          fetchPaidMonths(controller.signal),
+        ]);
+        if (cancelled) return;
+        if (pendingWrites.current > 0) return;
+        setWorkdays(new Set(days));
+        setPaidMonths(new Set(paid));
+        setSyncStatus("online");
+      } catch (err) {
+        if (cancelled) return;
+        if ((err as { name?: string })?.name === "AbortError") return;
+        setSyncStatus("offline");
+      }
+    }
+
+    syncFromServer(true);
+    const id = window.setInterval(() => syncFromServer(false), POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearInterval(id);
+    };
+  }, []);
 
   const { daysInMonth, firstWeekday } = useMemo(() => {
     const first = new Date(viewYear, viewMonth, 1);
@@ -122,14 +174,67 @@ export function WorkCalendar() {
 
   const totalCount = workdays.size;
 
-  function toggle(day: number) {
+  async function toggle(day: number) {
     const key = toKey(viewYear, viewMonth, day);
+    const isWorked = workdays.has(key);
+    const action: "add" | "remove" = isWorked ? "remove" : "add";
+
+    // Optimistic update
     setWorkdays((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
+      if (isWorked) next.delete(key);
       else next.add(key);
       return next;
     });
+
+    pendingWrites.current += 1;
+    setSyncStatus("syncing");
+    try {
+      const days = await postWorkday(key, action);
+      setWorkdays(new Set(days));
+      setSyncStatus("online");
+    } catch {
+      // Revert on error
+      setWorkdays((prev) => {
+        const next = new Set(prev);
+        if (isWorked) next.add(key);
+        else next.delete(key);
+        return next;
+      });
+      setSyncStatus("offline");
+    } finally {
+      pendingWrites.current = Math.max(0, pendingWrites.current - 1);
+    }
+  }
+
+  async function togglePaid(monthKey: string) {
+    const isPaid = paidMonths.has(monthKey);
+    const action: "add" | "remove" = isPaid ? "remove" : "add";
+
+    setPaidMonths((prev) => {
+      const next = new Set(prev);
+      if (isPaid) next.delete(monthKey);
+      else next.add(monthKey);
+      return next;
+    });
+
+    pendingWrites.current += 1;
+    setSyncStatus("syncing");
+    try {
+      const months = await postPaidMonth(monthKey, action);
+      setPaidMonths(new Set(months));
+      setSyncStatus("online");
+    } catch {
+      setPaidMonths((prev) => {
+        const next = new Set(prev);
+        if (isPaid) next.add(monthKey);
+        else next.delete(monthKey);
+        return next;
+      });
+      setSyncStatus("offline");
+    } finally {
+      pendingWrites.current = Math.max(0, pendingWrites.current - 1);
+    }
   }
 
   function prevMonth() {
@@ -272,10 +377,39 @@ export function WorkCalendar() {
             fontSize: 13,
             color: "var(--text-tertiary)",
             lineHeight: 1.5,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
           }}
         >
-          Clique em um dia para marcar como trabalhado. Os dias ficam salvos
-          no navegador.
+          <span>
+            Clique em um dia para marcar como trabalhado. Sincronizado entre
+            todos os acessos.
+          </span>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 500,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              color:
+                syncStatus === "offline"
+                  ? "var(--text-tertiary)"
+                  : "var(--text-tertiary)",
+              opacity: syncStatus === "syncing" ? 0.6 : 1,
+              whiteSpace: "nowrap",
+            }}
+            aria-live="polite"
+          >
+            {syncStatus === "syncing"
+              ? "sincronizando…"
+              : syncStatus === "offline"
+                ? "offline"
+                : syncStatus === "online"
+                  ? "sincronizado"
+                  : ""}
+          </span>
         </p>
       </div>
 
@@ -292,9 +426,11 @@ export function WorkCalendar() {
         </div>
         <div className="salary-item salary-item--accent">
           <span className="salary-label">Salário acumulado</span>
-          <span className="salary-value">{BRL.format(totalEarnings)}</span>
+          <span className="salary-value">{BRL.format(pendingEarnings)}</span>
           <span className="salary-meta">
-            {BRL.format(DAILY_RATE)} por dia
+            {paidEarnings > 0
+              ? `${BRL.format(paidEarnings)} já pago`
+              : `${BRL.format(DAILY_RATE)} por dia`}
           </span>
         </div>
       </div>
