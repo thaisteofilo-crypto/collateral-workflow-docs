@@ -135,28 +135,46 @@ export function WorkCalendar() {
         if (cancelled) return;
         if (pendingWrites.current > 0) return;
 
+        let workdaySet = new Set(days);
         let paidSet = new Set(paid);
 
         if (initial) {
-          // One-shot: Abril/2026 estava pago só no localStorage antes do KV sync
-          // e foi sobrescrito pelo servidor vazio. Restaura uma vez por browser.
-          const flag = "collateral.paidmonths.bootstrap.v1";
+          // One-shot: Abril/2026 (20 dias úteis + flag pago) foi sobrescrito
+          // pelo KV sync vazio. Restaura uma vez por browser.
+          const flag = "collateral.paidmonths.bootstrap.v2";
           if (!localStorage.getItem(flag)) {
-            if (paidSet.has("2026-04")) {
+            // Dias úteis de Abril/2026, exceto 21/04 (Tiradentes).
+            const aprilWorkdays = [
+              "2026-04-01", "2026-04-02", "2026-04-03",
+              "2026-04-06", "2026-04-07", "2026-04-08", "2026-04-09", "2026-04-10",
+              "2026-04-13", "2026-04-14", "2026-04-15", "2026-04-16", "2026-04-17",
+              "2026-04-20",
+              "2026-04-22", "2026-04-23", "2026-04-24",
+              "2026-04-27", "2026-04-28", "2026-04-29",
+            ];
+            try {
+              const dayPosts = aprilWorkdays
+                .filter((d) => !workdaySet.has(d))
+                .map((d) => postWorkday(d, "add"));
+              const paidPost = paidSet.has("2026-04")
+                ? Promise.resolve(null)
+                : postPaidMonth("2026-04", "add");
+              await Promise.all([...dayPosts, paidPost]);
+
+              const [freshDays, freshPaid] = await Promise.all([
+                fetchWorkdays(controller.signal),
+                fetchPaidMonths(controller.signal),
+              ]);
+              workdaySet = new Set(freshDays);
+              paidSet = new Set(freshPaid);
               localStorage.setItem(flag, "1");
-            } else {
-              try {
-                const months = await postPaidMonth("2026-04", "add");
-                paidSet = new Set(months);
-                localStorage.setItem(flag, "1");
-              } catch {
-                // tenta de novo no próximo mount
-              }
+            } catch {
+              // tenta de novo no próximo mount
             }
           }
         }
 
-        setWorkdays(new Set(days));
+        setWorkdays(workdaySet);
         setPaidMonths(paidSet);
         setSyncStatus("online");
       } catch (err) {
