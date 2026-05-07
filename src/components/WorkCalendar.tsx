@@ -289,7 +289,7 @@ export function WorkCalendar() {
   const totalCount = workdays.size;
 
   async function toggle(day: number) {
-    if (isMonthClosed(viewYear, viewMonth)) return;
+    if (isMonthClosed(viewYear, viewMonth) && !isAdmin) return;
     const key = toKey(viewYear, viewMonth, day);
     const isWorked = workdays.has(key);
     const action: "add" | "remove" = isWorked ? "remove" : "add";
@@ -478,16 +478,21 @@ export function WorkCalendar() {
               viewMonth === today.getMonth() &&
               viewYear === today.getFullYear();
             const closed = isMonthClosed(viewYear, viewMonth);
+            const locked = closed && !isAdmin;
             return (
               <button
                 key={i}
                 type="button"
                 onClick={() => toggle(d)}
-                disabled={closed}
-                title={closed ? "Mês fechado — não editável" : undefined}
+                disabled={locked}
+                title={
+                  locked
+                    ? "Mês fechado — destrave o modo admin para corrigir"
+                    : undefined
+                }
                 className={`cal-cell${isWorked ? " cal-cell--worked" : ""}${
                   isToday ? " cal-cell--today" : ""
-                }${closed ? " cal-cell--locked" : ""}`}
+                }${locked ? " cal-cell--locked" : ""}`}
               >
                 {d}
               </button>
@@ -507,8 +512,8 @@ export function WorkCalendar() {
           }}
         >
           <span>
-            Clique em um dia para marcar como trabalhado. Meses passados ficam
-            travados.
+            Clique em um dia para marcar/desmarcar. Meses passados ficam
+            travados — destrave o modo admin para corrigir.
           </span>
           <span
             style={{
