@@ -29,6 +29,17 @@ export default async function handler(req: Request) {
     }
 
     if (req.method === "POST") {
+      const expected = process.env.ADMIN_PASSWORD;
+      if (!expected) {
+        return Response.json(
+          { error: "ADMIN_PASSWORD não configurado no servidor" },
+          { status: 500 }
+        );
+      }
+      const password = req.headers.get("x-admin-password");
+      if (password !== expected) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
       const body = (await req.json()) as {
         month?: string;
         action?: "add" | "remove";

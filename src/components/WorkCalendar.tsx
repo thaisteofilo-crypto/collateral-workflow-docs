@@ -7,7 +7,7 @@ import {
 const STORAGE_KEY = "collateral.workdays.v1";
 const PAID_KEY = "collateral.paidmonths.v1";
 const ADMIN_FLAG = "collateral.admin.v1";
-const ADMIN_PASSWORD = "0505adm";
+const ADMIN_PWD_KEY = "collateral.admin.pwd.v1";
 
 const MONTHLY_SALARY = 2100;
 const DAYS_PER_MONTH = 20;
@@ -102,13 +102,42 @@ async function postPaidMonth(
   month: string,
   action: "add" | "remove"
 ): Promise<string[]> {
+  let password = "";
+  try {
+    password = localStorage.getItem(ADMIN_PWD_KEY) ?? "";
+  } catch {
+    // ignore
+  }
   const res = await fetch("/api/paid-months", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "x-admin-password": password,
+    },
     body: JSON.stringify({ month, action }),
   });
-  if (!res.ok) throw new Error("Falha ao salvar status de pagamento");
+  if (!res.ok) {
+    if (res.status === 401) {
+      try {
+        localStorage.removeItem(ADMIN_FLAG);
+        localStorage.removeItem(ADMIN_PWD_KEY);
+      } catch {
+        // ignore
+      }
+      throw new Error("unauthorized");
+    }
+    throw new Error("Falha ao salvar status de pagamento");
+  }
   return (await res.json()) as string[];
+}
+
+async function postAdminAuth(password: string): Promise<boolean> {
+  const res = await fetch("/api/admin-auth", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  return res.ok;
 }
 
 export function WorkCalendar() {
@@ -126,24 +155,32 @@ export function WorkCalendar() {
   >("idle");
   const [isAdmin, setIsAdmin] = useState<boolean>(loadAdmin);
 
-  function unlockAdmin() {
+  async function unlockAdmin() {
     const input = window.prompt("Senha admin:");
     if (input == null) return;
-    if (input.trim() === ADMIN_PASSWORD) {
-      try {
-        localStorage.setItem(ADMIN_FLAG, "ok");
-      } catch {
-        // ignore
+    const pwd = input.trim();
+    try {
+      const ok = await postAdminAuth(pwd);
+      if (ok) {
+        try {
+          localStorage.setItem(ADMIN_FLAG, "ok");
+          localStorage.setItem(ADMIN_PWD_KEY, pwd);
+        } catch {
+          // ignore
+        }
+        setIsAdmin(true);
+      } else {
+        window.alert("Senha incorreta");
       }
-      setIsAdmin(true);
-    } else {
-      window.alert("Senha incorreta");
+    } catch {
+      window.alert("Erro de conexão com o servidor");
     }
   }
 
   function lockAdmin() {
     try {
       localStorage.removeItem(ADMIN_FLAG);
+      localStorage.removeItem(ADMIN_PWD_KEY);
     } catch {
       // ignore
     }
@@ -182,9 +219,10 @@ export function WorkCalendar() {
         let paidSet = new Set(paid);
 
         if (initial) {
-          // One-shot: Abril/2026 (20 dias úteis + flag pago) foi sobrescrito
-          // pelo KV sync vazio. Restaura uma vez por browser.
-          const flag = "collateral.paidmonths.bootstrap.v2";
+          // One-shot: Abril/2026 (20 dias úteis) foi sobrescrito pelo KV sync
+          // vazio. Restaura os dias uma vez por browser. O flag "Pago" é
+          // marcado manualmente via modo admin (não é mais auto-restaurado).
+          const flag = "collateral.paidmonths.bootstrap.v3";
           if (!localStorage.getItem(flag)) {
             // Dias úteis de Abril/2026, exceto 21/04 (Tiradentes).
             const aprilWorkdays = [
@@ -199,17 +237,10 @@ export function WorkCalendar() {
               const dayPosts = aprilWorkdays
                 .filter((d) => !workdaySet.has(d))
                 .map((d) => postWorkday(d, "add"));
-              const paidPost = paidSet.has("2026-04")
-                ? Promise.resolve(null)
-                : postPaidMonth("2026-04", "add");
-              await Promise.all([...dayPosts, paidPost]);
+              await Promise.all(dayPosts);
 
-              const [freshDays, freshPaid] = await Promise.all([
-                fetchWorkdays(controller.signal),
-                fetchPaidMonths(controller.signal),
-              ]);
+              const freshDays = await fetchWorkdays(controller.signal);
               workdaySet = new Set(freshDays);
-              paidSet = new Set(freshPaid);
               localStorage.setItem(flag, "1");
             } catch {
               // tenta de novo no próximo mount
@@ -309,7 +340,7 @@ export function WorkCalendar() {
       const months = await postPaidMonth(monthKey, action);
       setPaidMonths(new Set(months));
       setSyncStatus("online");
-    } catch {
+    } catch (err) {
       setPaidMonths((prev) => {
         const next = new Set(prev);
         if (isPaid) next.add(monthKey);
@@ -317,6 +348,10 @@ export function WorkCalendar() {
         return next;
       });
       setSyncStatus("offline");
+      if ((err as Error)?.message === "unauthorized") {
+        setIsAdmin(false);
+        window.alert("Sessão admin expirou. Entre novamente.");
+      }
     } finally {
       pendingWrites.current = Math.max(0, pendingWrites.current - 1);
     }
