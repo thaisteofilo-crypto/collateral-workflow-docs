@@ -10,6 +10,7 @@ import { Templates, Fonts } from "./components/Assets";
 import { ReferenceGallery } from "./components/ReferenceGallery";
 import { Pipeline } from "./components/Pipeline";
 import { WorkCalendar } from "./components/WorkCalendar";
+import { Finance } from "./components/Finance";
 import { PasswordGate } from "./components/PasswordGate";
 import { ProfileGate, type Profile } from "./components/ProfileGate";
 import { CATEGORIES, findRoute } from "./routes";
@@ -30,6 +31,7 @@ function navigate(id: string) {
 function Page({ id, profile }: { id: string; profile: Profile }) {
   const route = findRoute(id);
   if (!route) return null;
+  if (route.visibleFor && !route.visibleFor.includes(profile)) return null;
   const cat = CATEGORIES.find((c) => c.id === route.category)?.label;
 
   let body: React.ReactNode = null;
@@ -78,6 +80,9 @@ function Page({ id, profile }: { id: string; profile: Profile }) {
           readOnly={profile !== "thais"}
         />
       );
+      break;
+    case "financas":
+      body = <Finance readOnly={profile !== "ane"} />;
       break;
   }
 

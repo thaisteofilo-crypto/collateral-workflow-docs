@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { Profile } from "./components/ProfileGate";
 
 export interface RouteDef {
   id: string;
@@ -10,11 +11,13 @@ export interface RouteDef {
   iconColor?: string;
   iconBg?: string;
   external?: string;
+  visibleFor?: Profile[]; // se ausente, visível pra todos
 }
 
 export interface Category {
   id: string;
   label: string;
+  visibleFor?: Profile[];
 }
 
 export const CATEGORIES: Category[] = [
@@ -23,6 +26,7 @@ export const CATEGORIES: Category[] = [
   { id: "padroes", label: "Padrões" },
   { id: "assets", label: "Assets" },
   { id: "trabalho", label: "Trabalho" },
+  { id: "financeiro", label: "Financeiro", visibleFor: ["ane"] },
 ];
 
 export const ROUTES: RouteDef[] = [
@@ -102,6 +106,15 @@ export const ROUTES: RouteDef[] = [
     subtitle:
       "Registro de tarefas por dia: capas, capas internas, resumos e ajustes.",
     category: "trabalho",
+  },
+  {
+    id: "financas",
+    title: "Finanças Pessoais",
+    shortLabel: "Finanças",
+    subtitle:
+      "Entradas, saídas, categorias e saldo do mês. Privado — só você vê.",
+    category: "financeiro",
+    visibleFor: ["ane"],
   },
 ];
 

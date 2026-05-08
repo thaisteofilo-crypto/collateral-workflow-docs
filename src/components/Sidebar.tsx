@@ -43,11 +43,20 @@ export function Sidebar({
     const grouped: Record<string, typeof ROUTES> = {};
     for (const cat of CATEGORIES) grouped[cat.id] = [];
     for (const route of ROUTES) {
+      if (route.visibleFor && !route.visibleFor.includes(profile)) continue;
       if (q && !route.title.toLowerCase().includes(q)) continue;
       grouped[route.category]?.push(route);
     }
     return grouped;
-  }, [search]);
+  }, [search, profile]);
+
+  const visibleCategories = useMemo(
+    () =>
+      CATEGORIES.filter(
+        (c) => !c.visibleFor || c.visibleFor.includes(profile)
+      ),
+    [profile]
+  );
 
   function toggleCat(id: string) {
     setOpenCats((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -92,7 +101,7 @@ export function Sidebar({
         </button>
 
         <nav className="sidebar-nav">
-          {CATEGORIES.map((cat) => {
+          {visibleCategories.map((cat) => {
             const items = filteredByCat[cat.id] ?? [];
             if (items.length === 0) return null;
             const open = openCats[cat.id];
