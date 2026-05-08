@@ -2,7 +2,16 @@ import { Redis } from "@upstash/redis";
 
 export const config = { runtime: "edge" };
 
-const KEY = "collateral:paidmonths:v1";
+const PAID_KEY_BY_PERSON: Record<string, string> = {
+  ane: "collateral:paidmonths:v1",
+  thais: "collateral:paidmonths:v1:thais",
+};
+
+function resolveKey(req: Request): string {
+  const url = new URL(req.url);
+  const id = url.searchParams.get("person") ?? "ane";
+  return PAID_KEY_BY_PERSON[id] ?? PAID_KEY_BY_PERSON.ane;
+}
 
 function getRedis() {
   const url =
@@ -20,6 +29,7 @@ function getRedis() {
 export default async function handler(req: Request) {
   try {
     const redis = getRedis();
+    const KEY = resolveKey(req);
 
     if (req.method === "GET") {
       const months = ((await redis.smembers(KEY)) as string[]) ?? [];

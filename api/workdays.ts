@@ -2,9 +2,30 @@ import { Redis } from "@upstash/redis";
 
 export const config = { runtime: "edge" };
 
-const KEY_V1 = "collateral:workdays:v1";
-const KEY = "collateral:workdays:v2";
-const MIGRATED_FLAG = "collateral:workdays:migrated:v2";
+type PersonConfig = {
+  workdaysKey: string;
+  legacyKey: string | null;
+  migratedFlag: string;
+};
+
+const PERSONS: Record<string, PersonConfig> = {
+  ane: {
+    workdaysKey: "collateral:workdays:v2",
+    legacyKey: "collateral:workdays:v1",
+    migratedFlag: "collateral:workdays:migrated:v2",
+  },
+  thais: {
+    workdaysKey: "collateral:workdays:v2:thais",
+    legacyKey: null,
+    migratedFlag: "collateral:workdays:migrated:v2:thais",
+  },
+};
+
+function resolvePerson(req: Request): PersonConfig {
+  const url = new URL(req.url);
+  const id = url.searchParams.get("person") ?? "ane";
+  return PERSONS[id] ?? PERSONS.ane;
+}
 
 type DayEntry = {
   capas: number;
@@ -66,23 +87,31 @@ function isEmpty(e: DayEntry): boolean {
   );
 }
 
-async function ensureMigrated(redis: Redis) {
-  const flag = await redis.get(MIGRATED_FLAG);
+async function ensureMigrated(redis: Redis, p: PersonConfig) {
+  const flag = await redis.get(p.migratedFlag);
   if (flag) return;
-  const oldDays = ((await redis.smembers(KEY_V1)) as string[]) ?? [];
-  if (oldDays.length > 0) {
-    const payload: Record<string, string> = {};
-    for (const d of oldDays) {
-      payload[d] = JSON.stringify(LEGACY_DEFAULT);
+  if (p.legacyKey) {
+    const oldDays = ((await redis.smembers(p.legacyKey)) as string[]) ?? [];
+    if (oldDays.length > 0) {
+      const payload: Record<string, string> = {};
+      for (const d of oldDays) {
+        payload[d] = JSON.stringify(LEGACY_DEFAULT);
+      }
+      await redis.hset(p.workdaysKey, payload);
     }
-    await redis.hset(KEY, payload);
   }
-  await redis.set(MIGRATED_FLAG, "1");
+  await redis.set(p.migratedFlag, "1");
 }
 
-async function readAll(redis: Redis): Promise<Record<string, DayEntry>> {
-  await ensureMigrated(redis);
-  const raw = (await redis.hgetall(KEY)) as Record<string, unknown> | null;
+async function readAll(
+  redis: Redis,
+  p: PersonConfig
+): Promise<Record<string, DayEntry>> {
+  await ensureMigrated(redis, p);
+  const raw = (await redis.hgetall(p.workdaysKey)) as Record<
+    string,
+    unknown
+  > | null;
   if (!raw) return {};
   const out: Record<string, DayEntry> = {};
   for (const [day, val] of Object.entries(raw)) {
@@ -94,9 +123,10 @@ async function readAll(redis: Redis): Promise<Record<string, DayEntry>> {
 export default async function handler(req: Request) {
   try {
     const redis = getRedis();
+    const person = resolvePerson(req);
 
     if (req.method === "GET") {
-      const all = await readAll(redis);
+      const all = await readAll(redis, person);
       return Response.json(all, {
         headers: { "cache-control": "no-store" },
       });
@@ -109,11 +139,13 @@ export default async function handler(req: Request) {
       }
       const entry = normalize(body.entry);
       if (isEmpty(entry)) {
-        await redis.hdel(KEY, body.day);
+        await redis.hdel(person.workdaysKey, body.day);
       } else {
-        await redis.hset(KEY, { [body.day]: JSON.stringify(entry) });
+        await redis.hset(person.workdaysKey, {
+          [body.day]: JSON.stringify(entry),
+        });
       }
-      const all = await readAll(redis);
+      const all = await readAll(redis, person);
       return Response.json(all, {
         headers: { "cache-control": "no-store" },
       });

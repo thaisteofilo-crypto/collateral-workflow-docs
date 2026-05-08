@@ -89,10 +89,18 @@ export const ROUTES: RouteDef[] = [
   },
   {
     id: "calendario",
-    title: "Calendário de Trabalho",
-    shortLabel: "Calendário",
+    title: "Calendário · Ane",
+    shortLabel: "Calendário · Ane",
     subtitle:
-      "Marque os dias trabalhados e o status de pagamento por mês. Salvo localmente.",
+      "Marque os dias trabalhados e o status de pagamento por mês. Salário R$ 105/dia.",
+    category: "trabalho",
+  },
+  {
+    id: "calendario-thais",
+    title: "Calendário · Thais",
+    shortLabel: "Calendário · Thais",
+    subtitle:
+      "Registro de tarefas por dia: capas, capas internas, resumos e ajustes.",
     category: "trabalho",
   },
 ];

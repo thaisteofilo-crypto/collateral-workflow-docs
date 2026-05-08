@@ -4,15 +4,31 @@ import {
   ArrowForwardIosLineIcon,
 } from "@overlens/legacy-icons";
 
-const STORAGE_KEY = "collateral.workdays.v2";
-const STORAGE_KEY_LEGACY = "collateral.workdays.v1";
-const PAID_KEY = "collateral.paidmonths.v1";
 const ADMIN_FLAG = "collateral.admin.v1";
 const ADMIN_PWD_KEY = "collateral.admin.pwd.v1";
 
 const MONTHLY_SALARY = 2100;
 const DAYS_PER_MONTH = 20;
 const DAILY_RATE = MONTHLY_SALARY / DAYS_PER_MONTH;
+
+type PersonStorage = {
+  workdaysKey: string;
+  legacyKey: string | null;
+  paidKey: string | null;
+};
+
+const PERSON_STORAGE: Record<string, PersonStorage> = {
+  ane: {
+    workdaysKey: "collateral.workdays.v2",
+    legacyKey: "collateral.workdays.v1",
+    paidKey: "collateral.paidmonths.v1",
+  },
+  thais: {
+    workdaysKey: "collateral.workdays.v2.thais",
+    legacyKey: null,
+    paidKey: null,
+  },
+};
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -117,9 +133,9 @@ function normalizeEntry(raw: unknown): DayEntry {
   };
 }
 
-function loadWorkdaysCache(): Map<string, DayEntry> {
+function loadWorkdaysCache(storage: PersonStorage): Map<string, DayEntry> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storage.workdaysKey);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
@@ -131,16 +147,17 @@ function loadWorkdaysCache(): Map<string, DayEntry> {
         return m;
       }
     }
-    // Legado: array de strings (v1)
-    const legacy = localStorage.getItem(STORAGE_KEY_LEGACY);
-    if (legacy) {
-      const parsed = JSON.parse(legacy);
-      if (Array.isArray(parsed)) {
-        const m = new Map<string, DayEntry>();
-        for (const k of parsed) {
-          if (typeof k === "string") m.set(k, { ...LEGACY_ENTRY });
+    if (storage.legacyKey) {
+      const legacy = localStorage.getItem(storage.legacyKey);
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
+        if (Array.isArray(parsed)) {
+          const m = new Map<string, DayEntry>();
+          for (const k of parsed) {
+            if (typeof k === "string") m.set(k, { ...LEGACY_ENTRY });
+          }
+          return m;
         }
-        return m;
       }
     }
     return new Map();
@@ -149,19 +166,23 @@ function loadWorkdaysCache(): Map<string, DayEntry> {
   }
 }
 
-function saveWorkdaysCache(map: Map<string, DayEntry>) {
+function saveWorkdaysCache(
+  storage: PersonStorage,
+  map: Map<string, DayEntry>
+) {
   try {
     const obj: Record<string, DayEntry> = {};
     for (const [k, v] of map) obj[k] = v;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+    localStorage.setItem(storage.workdaysKey, JSON.stringify(obj));
   } catch {
     // ignore
   }
 }
 
-function loadPaidCache(): Set<string> {
+function loadPaidCache(storage: PersonStorage): Set<string> {
+  if (!storage.paidKey) return new Set();
   try {
-    const raw = localStorage.getItem(PAID_KEY);
+    const raw = localStorage.getItem(storage.paidKey);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? new Set(parsed) : new Set();
@@ -170,18 +191,23 @@ function loadPaidCache(): Set<string> {
   }
 }
 
-function savePaidCache(set: Set<string>) {
+function savePaidCache(storage: PersonStorage, set: Set<string>) {
+  if (!storage.paidKey) return;
   try {
-    localStorage.setItem(PAID_KEY, JSON.stringify(Array.from(set)));
+    localStorage.setItem(storage.paidKey, JSON.stringify(Array.from(set)));
   } catch {
     // ignore
   }
 }
 
 async function fetchWorkdays(
+  personId: string,
   signal?: AbortSignal
 ): Promise<Record<string, DayEntry>> {
-  const res = await fetch("/api/workdays", { signal, cache: "no-store" });
+  const res = await fetch(`/api/workdays?person=${personId}`, {
+    signal,
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error("Falha ao carregar dias");
   const data = (await res.json()) as Record<string, unknown>;
   const out: Record<string, DayEntry> = {};
@@ -192,10 +218,11 @@ async function fetchWorkdays(
 }
 
 async function postWorkday(
+  personId: string,
   day: string,
   entry: DayEntry
 ): Promise<Record<string, DayEntry>> {
-  const res = await fetch("/api/workdays", {
+  const res = await fetch(`/api/workdays?person=${personId}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ day, entry }),
@@ -209,13 +236,20 @@ async function postWorkday(
   return out;
 }
 
-async function fetchPaidMonths(signal?: AbortSignal): Promise<string[]> {
-  const res = await fetch("/api/paid-months", { signal, cache: "no-store" });
+async function fetchPaidMonths(
+  personId: string,
+  signal?: AbortSignal
+): Promise<string[]> {
+  const res = await fetch(`/api/paid-months?person=${personId}`, {
+    signal,
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error("Falha ao carregar meses pagos");
   return (await res.json()) as string[];
 }
 
 async function postPaidMonth(
+  personId: string,
   month: string,
   action: "add" | "remove"
 ): Promise<string[]> {
@@ -225,7 +259,7 @@ async function postPaidMonth(
   } catch {
     // ignore
   }
-  const res = await fetch("/api/paid-months", {
+  const res = await fetch(`/api/paid-months?person=${personId}`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -406,15 +440,25 @@ function DayEditModal({
   );
 }
 
-export function WorkCalendar() {
+export type CalendarMode = "salary" | "tasks";
+
+export function WorkCalendar({
+  personId = "ane",
+  mode = "salary",
+}: {
+  personId?: string;
+  mode?: CalendarMode;
+} = {}) {
+  const storage = PERSON_STORAGE[personId] ?? PERSON_STORAGE.ane;
+  const showSalary = mode === "salary";
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [workdays, setWorkdays] = useState<Map<string, DayEntry>>(() =>
-    loadWorkdaysCache()
+    loadWorkdaysCache(storage)
   );
   const [paidMonths, setPaidMonths] = useState<Set<string>>(() =>
-    loadPaidCache()
+    loadPaidCache(storage)
   );
   const [syncStatus, setSyncStatus] = useState<
     "idle" | "syncing" | "online" | "offline"
@@ -459,12 +503,12 @@ export function WorkCalendar() {
 
   // Cache locally whenever state changes
   useEffect(() => {
-    saveWorkdaysCache(workdays);
-  }, [workdays]);
+    saveWorkdaysCache(storage, workdays);
+  }, [storage, workdays]);
 
   useEffect(() => {
-    savePaidCache(paidMonths);
-  }, [paidMonths]);
+    savePaidCache(storage, paidMonths);
+  }, [storage, paidMonths]);
 
   // Initial load + polling
   useEffect(() => {
@@ -475,17 +519,23 @@ export function WorkCalendar() {
       if (pendingWrites.current > 0) return;
       try {
         if (initial) setSyncStatus("syncing");
-        const [days, paid] = await Promise.all([
-          fetchWorkdays(controller.signal),
-          fetchPaidMonths(controller.signal),
-        ]);
+        const requests: [
+          Promise<Record<string, DayEntry>>,
+          Promise<string[]>,
+        ] = [
+          fetchWorkdays(personId, controller.signal),
+          showSalary
+            ? fetchPaidMonths(personId, controller.signal)
+            : Promise.resolve([] as string[]),
+        ];
+        const [days, paid] = await Promise.all(requests);
         if (cancelled) return;
         if (pendingWrites.current > 0) return;
 
         let workdayMap = recordToMap(days);
         const paidSet = new Set(paid);
 
-        if (initial) {
+        if (initial && personId === "ane") {
           // One-shot: Abril/2026 (20 dias úteis) precisou ser restaurado
           // após o KV ter sido sobrescrito vazio. Faz o restore uma vez por
           // browser, com a regra histórica de 2 capas/dia.
@@ -516,10 +566,13 @@ export function WorkCalendar() {
             try {
               const dayPosts = aprilWorkdays
                 .filter((d) => !workdayMap.has(d))
-                .map((d) => postWorkday(d, { ...LEGACY_ENTRY }));
+                .map((d) => postWorkday(personId, d, { ...LEGACY_ENTRY }));
               if (dayPosts.length > 0) {
                 await Promise.all(dayPosts);
-                const fresh = await fetchWorkdays(controller.signal);
+                const fresh = await fetchWorkdays(
+                  personId,
+                  controller.signal
+                );
                 workdayMap = recordToMap(fresh);
               }
               localStorage.setItem(flag, "1");
@@ -547,7 +600,8 @@ export function WorkCalendar() {
       controller.abort();
       window.clearInterval(id);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personId, showSalary]);
 
   const { daysInMonth, firstWeekday } = useMemo(() => {
     const first = new Date(viewYear, viewMonth, 1);
@@ -604,7 +658,7 @@ export function WorkCalendar() {
     pendingWrites.current += 1;
     setSyncStatus("syncing");
     try {
-      const days = await postWorkday(key, nextEntry);
+      const days = await postWorkday(personId, key, nextEntry);
       setWorkdays(recordToMap(days));
       setSyncStatus("online");
     } catch {
@@ -636,7 +690,7 @@ export function WorkCalendar() {
     pendingWrites.current += 1;
     setSyncStatus("syncing");
     try {
-      const months = await postPaidMonth(monthKey, action);
+      const months = await postPaidMonth(personId, monthKey, action);
       setPaidMonths(new Set(months));
       setSyncStatus("online");
     } catch (err) {
@@ -854,7 +908,12 @@ export function WorkCalendar() {
         </p>
       </div>
 
-      <div className="salary-grid">
+      <div
+        className="salary-grid"
+        style={
+          showSalary ? undefined : { gridTemplateColumns: "repeat(2, 1fr)" }
+        }
+      >
         <div className="salary-item">
           <span className="salary-label">Dias trabalhados</span>
           <span className="salary-value">{totalCount}</span>
@@ -867,15 +926,19 @@ export function WorkCalendar() {
             {hasItems ? "soma de todos os tipos" : "nenhum registro ainda"}
           </span>
         </div>
-        <div className="salary-item salary-item--accent">
-          <span className="salary-label">Salário acumulado</span>
-          <span className="salary-value">{BRL.format(pendingEarnings)}</span>
-          <span className="salary-meta">
-            {paidEarnings > 0
-              ? `${BRL.format(paidEarnings)} já pago`
-              : `${BRL.format(DAILY_RATE)} por dia`}
-          </span>
-        </div>
+        {showSalary && (
+          <div className="salary-item salary-item--accent">
+            <span className="salary-label">Salário acumulado</span>
+            <span className="salary-value">
+              {BRL.format(pendingEarnings)}
+            </span>
+            <span className="salary-meta">
+              {paidEarnings > 0
+                ? `${BRL.format(paidEarnings)} já pago`
+                : `${BRL.format(DAILY_RATE)} por dia`}
+            </span>
+          </div>
+        )}
       </div>
 
       {hasItems && (
@@ -891,20 +954,22 @@ export function WorkCalendar() {
 
       {monthlyBreakdown.length > 0 && (
         <>
-          <div className="payment-summary">
-            <div className="payment-pill payment-pill--paid">
-              <span className="payment-pill-label">Pago</span>
-              <span className="payment-pill-value">
-                {BRL.format(paidEarnings)}
-              </span>
+          {showSalary && (
+            <div className="payment-summary">
+              <div className="payment-pill payment-pill--paid">
+                <span className="payment-pill-label">Pago</span>
+                <span className="payment-pill-value">
+                  {BRL.format(paidEarnings)}
+                </span>
+              </div>
+              <div className="payment-pill payment-pill--pending">
+                <span className="payment-pill-label">Pendente</span>
+                <span className="payment-pill-value">
+                  {BRL.format(pendingEarnings)}
+                </span>
+              </div>
             </div>
-            <div className="payment-pill payment-pill--pending">
-              <span className="payment-pill-label">Pendente</span>
-              <span className="payment-pill-value">
-                {BRL.format(pendingEarnings)}
-              </span>
-            </div>
-          </div>
+          )}
 
           <div className="step-card" style={{ gap: 10 }}>
             <div
@@ -933,10 +998,16 @@ export function WorkCalendar() {
                 title={
                   isAdmin
                     ? "Travar (sair do modo admin)"
-                    : "Destravar pagamento (modo admin)"
+                    : showSalary
+                      ? "Destravar pagamento (modo admin)"
+                      : "Destravar edição de meses passados"
                 }
               >
-                {isAdmin ? "Travar pagamento" : "Modo admin"}
+                {isAdmin
+                  ? showSalary
+                    ? "Travar pagamento"
+                    : "Travar edição"
+                  : "Modo admin"}
               </button>
             </div>
             {monthlyBreakdown.map((m) => {
@@ -948,7 +1019,7 @@ export function WorkCalendar() {
                 <div
                   key={m.key}
                   className={`month-row${isCurrent ? " is-current" : ""}${
-                    m.paid ? " is-paid" : ""
+                    m.paid && showSalary ? " is-paid" : ""
                   }`}
                 >
                   <button
@@ -967,32 +1038,37 @@ export function WorkCalendar() {
                         : ""}
                     </span>
                   </button>
-                  <span className="month-row-value">
-                    {BRL.format(m.earnings)}
-                  </span>
-                  {isAdmin ? (
-                    <button
-                      type="button"
-                      className={`payment-toggle${
-                        m.paid ? " is-paid" : ""
-                      }`}
-                      onClick={() => togglePaid(m.key)}
-                      title={
-                        m.paid ? "Marcar como pendente" : "Marcar como pago"
-                      }
-                    >
-                      {m.paid ? "✓ Pago" : "Pendente"}
-                    </button>
-                  ) : (
-                    <span
-                      className={`payment-toggle is-readonly${
-                        m.paid ? " is-paid" : ""
-                      }`}
-                      title="Apenas modo admin pode alterar"
-                    >
-                      {m.paid ? "✓ Pago" : "Pendente"}
+                  {showSalary && (
+                    <span className="month-row-value">
+                      {BRL.format(m.earnings)}
                     </span>
                   )}
+                  {showSalary &&
+                    (isAdmin ? (
+                      <button
+                        type="button"
+                        className={`payment-toggle${
+                          m.paid ? " is-paid" : ""
+                        }`}
+                        onClick={() => togglePaid(m.key)}
+                        title={
+                          m.paid
+                            ? "Marcar como pendente"
+                            : "Marcar como pago"
+                        }
+                      >
+                        {m.paid ? "✓ Pago" : "Pendente"}
+                      </button>
+                    ) : (
+                      <span
+                        className={`payment-toggle is-readonly${
+                          m.paid ? " is-paid" : ""
+                        }`}
+                        title="Apenas modo admin pode alterar"
+                      >
+                        {m.paid ? "✓ Pago" : "Pendente"}
+                      </span>
+                    ))}
                 </div>
               );
             })}

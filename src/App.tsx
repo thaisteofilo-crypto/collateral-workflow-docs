@@ -61,7 +61,10 @@ function Page({ id }: { id: string }) {
       body = <Pipeline />;
       break;
     case "calendario":
-      body = <WorkCalendar />;
+      body = <WorkCalendar personId="ane" mode="salary" />;
+      break;
+    case "calendario-thais":
+      body = <WorkCalendar personId="thais" mode="tasks" />;
       break;
   }
 
