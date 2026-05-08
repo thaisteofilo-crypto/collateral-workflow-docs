@@ -569,7 +569,7 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
             variant="divida"
           />
           <SummaryItem
-            label="Balanço"
+            label="Status do mês"
             value={summary.balanco}
             variant={summary.balanco >= 0 ? "positive" : "negative"}
           />
@@ -739,7 +739,7 @@ function AnnualView({
               <th>Variáveis</th>
               <th>Dívidas</th>
               <th>Investimentos</th>
-              <th>Balanço</th>
+              <th>Status do mês</th>
             </tr>
           </thead>
           <tbody>
@@ -774,16 +774,8 @@ function AnnualView({
                   >
                     {formatBRL(m.summary.investimentos)}
                   </td>
-                  <td
-                    className={
-                      m.summary.balanco > 0
-                        ? "is-positive"
-                        : m.summary.balanco < 0
-                          ? "is-negative"
-                          : ""
-                    }
-                  >
-                    {formatBRL(m.summary.balanco)}
+                  <td className="annual-status-cell">
+                    <StatusChip balanco={m.summary.balanco} />
                   </td>
                 </tr>
               );
@@ -799,21 +791,36 @@ function AnnualView({
               <td className="is-investment">
                 {formatBRL(total.investimentos)}
               </td>
-              <td
-                className={
-                  total.balanco > 0
-                    ? "is-positive"
-                    : total.balanco < 0
-                      ? "is-negative"
-                      : ""
-                }
-              >
-                {formatBRL(total.balanco)}
+              <td className="annual-status-cell">
+                <StatusChip balanco={total.balanco} />
               </td>
             </tr>
           </tfoot>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ---- Status chip (annual table) ----
+
+function StatusChip({ balanco }: { balanco: number }) {
+  if (balanco === 0) {
+    return <span className="status-chip is-neutral">—</span>;
+  }
+  const positive = balanco > 0;
+  return (
+    <div className="status-chip-wrap">
+      <span
+        className={`status-chip ${positive ? "is-positive" : "is-negative"}`}
+      >
+        {positive ? "Positivo" : "Negativo"}
+      </span>
+      <span
+        className={`status-chip-value ${positive ? "is-positive" : "is-negative"}`}
+      >
+        {formatBRL(balanco)}
+      </span>
     </div>
   );
 }
