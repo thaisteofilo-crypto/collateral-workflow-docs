@@ -577,49 +577,85 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
         </span>
       </div>
 
-      {/* Listas */}
-      <FinanceSection
-        subtype="ganho"
-        entries={ganhos}
-        tags={tags}
-        readOnly={readOnly}
-        onAdd={() => setEditing({ newSubtype: "ganho" })}
-        onEdit={(e) => setEditing({ entry: e })}
-      />
-      <FinanceSection
-        subtype="fixa"
-        entries={fixas}
-        tags={tags}
-        readOnly={readOnly}
-        onAdd={() => setEditing({ newSubtype: "fixa" })}
-        onEdit={(e) => setEditing({ entry: e })}
-      />
-      <FinanceSection
-        subtype="variavel"
-        entries={variaveis}
-        tags={tags}
-        readOnly={readOnly}
-        onAdd={() => setEditing({ newSubtype: "variavel" })}
-        onEdit={(e) => setEditing({ entry: e })}
-      />
-      <FinanceSection
-        subtype="divida"
-        entries={dividas}
-        tags={tags}
-        readOnly={readOnly}
-        onAdd={() => setEditing({ newSubtype: "divida" })}
-        onEdit={(e) => setEditing({ entry: e })}
-      />
-      <FinanceSection
-        subtype="investimento"
-        entries={investimentos}
-        tags={tags}
-        readOnly={readOnly}
-        showMonth
-        emptyHint="Investimentos aparecem aqui independente do mês selecionado."
-        onAdd={() => setEditing({ newSubtype: "investimento" })}
-        onEdit={(e) => setEditing({ entry: e })}
-      />
+      {/* Botão único de adicionar */}
+      {!readOnly && (
+        <div className="finance-global-add">
+          <button
+            type="button"
+            className="finance-global-add-button"
+            onClick={() => setEditing({ newSubtype: "ganho" })}
+          >
+            + Adicionar lançamento
+          </button>
+          <span className="finance-global-add-hint">
+            Você escolhe o tipo no popup
+          </span>
+        </div>
+      )}
+
+      {/* Empty state quando nada no mês */}
+      {ganhos.length === 0 &&
+        fixas.length === 0 &&
+        variaveis.length === 0 &&
+        dividas.length === 0 &&
+        investimentos.length === 0 && (
+          <div className="finance-empty-state">
+            <span className="finance-empty-state-icon" aria-hidden>
+              ◔
+            </span>
+            <span className="finance-empty-state-text">
+              Nenhum lançamento ainda. Comece adicionando o primeiro acima.
+            </span>
+          </div>
+        )}
+
+      {/* Listas (só aparecem se tiver entries) */}
+      {ganhos.length > 0 && (
+        <FinanceSection
+          subtype="ganho"
+          entries={ganhos}
+          tags={tags}
+          readOnly={readOnly}
+          onEdit={(e) => setEditing({ entry: e })}
+        />
+      )}
+      {fixas.length > 0 && (
+        <FinanceSection
+          subtype="fixa"
+          entries={fixas}
+          tags={tags}
+          readOnly={readOnly}
+          onEdit={(e) => setEditing({ entry: e })}
+        />
+      )}
+      {variaveis.length > 0 && (
+        <FinanceSection
+          subtype="variavel"
+          entries={variaveis}
+          tags={tags}
+          readOnly={readOnly}
+          onEdit={(e) => setEditing({ entry: e })}
+        />
+      )}
+      {dividas.length > 0 && (
+        <FinanceSection
+          subtype="divida"
+          entries={dividas}
+          tags={tags}
+          readOnly={readOnly}
+          onEdit={(e) => setEditing({ entry: e })}
+        />
+      )}
+      {investimentos.length > 0 && (
+        <FinanceSection
+          subtype="investimento"
+          entries={investimentos}
+          tags={tags}
+          readOnly={readOnly}
+          showMonth
+          onEdit={(e) => setEditing({ entry: e })}
+        />
+      )}
 
       {/* Tags */}
       {!readOnly && (
@@ -799,8 +835,6 @@ function FinanceSection({
   tags,
   readOnly,
   showMonth,
-  emptyHint,
-  onAdd,
   onEdit,
 }: {
   subtype: FinanceSubtype;
@@ -808,8 +842,6 @@ function FinanceSection({
   tags: Tag[];
   readOnly: boolean;
   showMonth?: boolean;
-  emptyHint?: string;
-  onAdd: () => void;
   onEdit: (entry: FinanceEntry) => void;
 }) {
   const meta = subtypeMeta(subtype);
@@ -834,15 +866,6 @@ function FinanceSection({
           <span className="finance-section-title">{meta.pluralLabel}</span>
           <span className="finance-section-total">{formatBRL(total)}</span>
         </div>
-        {!readOnly && (
-          <button
-            type="button"
-            className="finance-add-button"
-            onClick={onAdd}
-          >
-            + Adicionar
-          </button>
-        )}
       </div>
 
       {tagSummary.length > 0 && total > 0 && (
@@ -867,25 +890,17 @@ function FinanceSection({
         </div>
       )}
 
-      {entries.length === 0 ? (
-        <span className="finance-empty">
-          {emptyHint ?? `Nenhum lançamento neste mês.`}
-        </span>
-      ) : (
-        <div className="finance-list">
-          {entries.map((e) => (
-            <FinanceRow
-              key={e.id}
-              entry={e}
-              tags={tags}
-              showMonth={showMonth}
-              onClick={
-                readOnly || e.auto ? undefined : () => onEdit(e)
-              }
-            />
-          ))}
-        </div>
-      )}
+      <div className="finance-list">
+        {entries.map((e) => (
+          <FinanceRow
+            key={e.id}
+            entry={e}
+            tags={tags}
+            showMonth={showMonth}
+            onClick={readOnly || e.auto ? undefined : () => onEdit(e)}
+          />
+        ))}
+      </div>
     </div>
   );
 }

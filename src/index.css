@@ -779,6 +779,62 @@ a {
   color: var(--text-tertiary);
 }
 
+/* ---- Global add button ---- */
+.finance-global-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.finance-global-add-button {
+  background: var(--text-primary);
+  color: var(--surface);
+  border: 1px solid var(--text-primary);
+  border-radius: 100px;
+  padding: 12px 24px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.finance-global-add-button:hover {
+  opacity: 0.9;
+}
+.finance-global-add-button:active {
+  transform: scale(0.98);
+}
+.finance-global-add-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* ---- Empty state ---- */
+.finance-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 24px;
+  border: 1px dashed var(--border-default);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+.finance-empty-state-icon {
+  font-size: 32px;
+  opacity: 0.5;
+}
+.finance-empty-state-text {
+  font-size: 14px;
+  max-width: 360px;
+  line-height: 1.5;
+}
+
 /* ---- Annual table ---- */
 .annual-header {
   display: flex;
