@@ -118,7 +118,9 @@ function App() {
               onSwitchProfile={switchProfile}
             />
             <main className="content-area">
-              <div className="content-inner">
+              <div
+                className={`content-inner${page === "financas" ? " is-wide" : ""}`}
+              >
                 {page === "home" ? (
                   <HomePage onNavigate={navigate} />
                 ) : (
