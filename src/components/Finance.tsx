@@ -555,26 +555,22 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
             variant={summary.balanco >= 0 ? "positive" : "negative"}
           />
         </div>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 500,
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            color: "var(--text-tertiary)",
-            opacity: syncStatus === "syncing" ? 0.6 : 1,
-            alignSelf: "flex-end",
-          }}
-          aria-live="polite"
-        >
-          {syncStatus === "syncing"
-            ? "sincronizando…"
-            : syncStatus === "offline"
-              ? "offline"
-              : syncStatus === "online"
-                ? "sincronizado"
-                : ""}
-        </span>
+        {(syncStatus === "syncing" || syncStatus === "offline") && (
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 500,
+              color:
+                syncStatus === "offline" ? "#F87C56" : "var(--text-tertiary)",
+              opacity: syncStatus === "syncing" ? 0.7 : 1,
+              alignSelf: "flex-end",
+              fontStyle: "italic",
+            }}
+            aria-live="polite"
+          >
+            {syncStatus === "syncing" ? "sincronizando…" : "offline"}
+          </span>
+        )}
       </div>
 
       {/* Botão único de adicionar */}
