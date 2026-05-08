@@ -86,9 +86,19 @@ function Page({ id, profile }: { id: string; profile: Profile }) {
       break;
   }
 
+  // Finanças renderiza seu próprio header pra acomodar o botão "+ Adicionar"
+  // alinhado à direita.
+  const skipAutoHeader = id === "financas";
+
   return (
     <>
-      <PageHeader title={route.title} subtitle={route.subtitle} category={cat} />
+      {!skipAutoHeader && (
+        <PageHeader
+          title={route.title}
+          subtitle={route.subtitle}
+          category={cat}
+        />
+      )}
       <div className="page-body">{body}</div>
     </>
   );

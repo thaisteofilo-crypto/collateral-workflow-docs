@@ -352,6 +352,20 @@ a {
   gap: 14px;
   padding-bottom: 12px;
 }
+.page-header.has-actions {
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.page-header.has-actions .page-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
 .page-header-cat {
   font-size: 11px;
   font-weight: 600;

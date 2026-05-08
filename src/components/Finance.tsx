@@ -465,6 +465,25 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
 
   return (
     <>
+      <header className="page-header has-actions">
+        <div className="page-header-text">
+          <span className="page-header-cat">Financeiro</span>
+          <h1 className="page-header-title">Finanças Pessoais</h1>
+          <p className="page-header-sub">
+            Entradas, saídas, categorias e saldo do mês. Privado — só você vê.
+          </p>
+        </div>
+        {!readOnly && (
+          <button
+            type="button"
+            className="finance-global-add-button"
+            onClick={() => setEditing({ newSubtype: "ganho" })}
+          >
+            + Adicionar lançamento
+          </button>
+        )}
+      </header>
+
       {readOnly && (
         <div className="readonly-banner">
           <span className="readonly-banner-icon" aria-hidden>
@@ -572,22 +591,6 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
           </span>
         )}
       </div>
-
-      {/* Botão único de adicionar */}
-      {!readOnly && (
-        <div className="finance-global-add">
-          <button
-            type="button"
-            className="finance-global-add-button"
-            onClick={() => setEditing({ newSubtype: "ganho" })}
-          >
-            + Adicionar lançamento
-          </button>
-          <span className="finance-global-add-hint">
-            Você escolhe o tipo no popup
-          </span>
-        </div>
-      )}
 
       {/* Empty state quando nada no mês */}
       {ganhos.length === 0 &&
