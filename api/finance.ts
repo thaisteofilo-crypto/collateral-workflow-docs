@@ -28,12 +28,27 @@ function getRedis() {
 
 type StoredEntry = {
   id: string;
-  type: "income" | "expense";
+  subtype: "ganho" | "fixa" | "variavel" | "divida" | "investimento";
   date: string;
   description: string;
   amount: number;
-  category: string;
-  receivedAt?: string;
+  tag?: string;
+  status?: "pago" | "a_pagar";
+  category?: string;
+  paymentMethod?:
+    | "pix"
+    | "debito"
+    | "credito"
+    | "dinheiro"
+    | "boleto"
+    | "transferencia";
+  receiptUrl?: string;
+  card?: string;
+  installments?: string;
+  debtor?: string;
+  totalAmount?: number;
+  broker?: string;
+  investmentType?: string;
 };
 
 function normalize(raw: unknown): StoredEntry | null {
@@ -50,25 +65,74 @@ function normalize(raw: unknown): StoredEntry | null {
     return null;
   }
   if (typeof obj.id !== "string" || !obj.id) return null;
-  const type = obj.type === "income" ? "income" : "expense";
   const date = typeof obj.date === "string" ? obj.date : "";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
   const amount = Math.max(0, Math.round(Number(obj.amount ?? 0)));
   if (!Number.isFinite(amount)) return null;
   const description =
     typeof obj.description === "string" ? obj.description : "";
-  const category =
-    typeof obj.category === "string" && obj.category
-      ? obj.category
-      : type === "income"
-        ? "outros-income"
-        : "outros-expense";
-  const receivedAt =
-    typeof obj.receivedAt === "string" &&
-    /^\d{4}-\d{2}-\d{2}$/.test(obj.receivedAt)
-      ? obj.receivedAt
-      : undefined;
-  return { id: obj.id, type, date, description, amount, category, receivedAt };
+
+  let subtype: StoredEntry["subtype"];
+  if (
+    obj.subtype === "ganho" ||
+    obj.subtype === "fixa" ||
+    obj.subtype === "variavel" ||
+    obj.subtype === "divida" ||
+    obj.subtype === "investimento"
+  ) {
+    subtype = obj.subtype;
+  } else if (obj.type === "income") {
+    subtype = "ganho";
+  } else if (obj.type === "expense") {
+    subtype = "variavel";
+  } else {
+    return null;
+  }
+
+  let status: StoredEntry["status"];
+  if (obj.status === "pago" || obj.status === "a_pagar") {
+    status = obj.status;
+  } else if (typeof obj.receivedAt === "string") {
+    status = "pago";
+  }
+
+  const out: StoredEntry = {
+    id: obj.id,
+    subtype,
+    date,
+    description,
+    amount,
+  };
+  if (typeof obj.tag === "string" && obj.tag) out.tag = obj.tag;
+  if (status) out.status = status;
+  if (typeof obj.category === "string" && obj.category)
+    out.category = obj.category;
+  if (
+    obj.paymentMethod === "pix" ||
+    obj.paymentMethod === "debito" ||
+    obj.paymentMethod === "credito" ||
+    obj.paymentMethod === "dinheiro" ||
+    obj.paymentMethod === "boleto" ||
+    obj.paymentMethod === "transferencia"
+  ) {
+    out.paymentMethod = obj.paymentMethod;
+  }
+  if (typeof obj.receiptUrl === "string" && obj.receiptUrl)
+    out.receiptUrl = obj.receiptUrl;
+  if (typeof obj.card === "string") out.card = obj.card;
+  if (typeof obj.installments === "string") out.installments = obj.installments;
+  if (typeof obj.debtor === "string") out.debtor = obj.debtor;
+  if (
+    typeof obj.totalAmount === "number" &&
+    Number.isFinite(obj.totalAmount) &&
+    obj.totalAmount >= 0
+  ) {
+    out.totalAmount = Math.round(obj.totalAmount);
+  }
+  if (typeof obj.broker === "string") out.broker = obj.broker;
+  if (typeof obj.investmentType === "string")
+    out.investmentType = obj.investmentType;
+  return out;
 }
 
 async function readAll(redis: Redis, key: string): Promise<StoredEntry[]> {

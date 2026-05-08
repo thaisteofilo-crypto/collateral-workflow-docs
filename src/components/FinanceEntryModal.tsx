@@ -1,64 +1,77 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  EXPENSE_CATEGORIES,
-  INCOME_CATEGORIES,
+  BROKERS,
+  CATEGORIES,
+  INVESTMENT_TYPES,
+  PAYMENT_METHODS,
+  SUBTYPES,
   type FinanceEntry,
-  type FinanceEntryType,
+  type FinanceStatus,
+  type FinanceSubtype,
+  type PaymentMethodId,
+  type Tag,
   formatBRL,
   newEntryId,
   parseBRLInput,
 } from "../finance";
 
-type Mode = "add" | "edit";
-
 export function FinanceEntryModal({
-  initialType,
+  subtype: initialSubtype,
   initialDate,
   existing,
+  tags,
   onClose,
   onSave,
   onDelete,
 }: {
-  initialType: FinanceEntryType;
-  initialDate: string; // YYYY-MM-DD
+  subtype: FinanceSubtype;
+  initialDate: string;
   existing?: FinanceEntry;
+  tags: Tag[];
   onClose: () => void;
   onSave: (entry: FinanceEntry) => void;
   onDelete?: () => void;
 }) {
-  const mode: Mode = existing ? "edit" : "add";
-  const [type, setType] = useState<FinanceEntryType>(
-    existing?.type ?? initialType
+  const isEdit = !!existing;
+  const [subtype, setSubtype] = useState<FinanceSubtype>(
+    existing?.subtype ?? initialSubtype
   );
   const [date, setDate] = useState(existing?.date ?? initialDate);
   const [description, setDescription] = useState(existing?.description ?? "");
-  const categories =
-    type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  const defaultCategory =
-    type === "income" ? "outros-income" : "outros-expense";
-  const [category, setCategory] = useState(
-    existing?.category ?? defaultCategory
-  );
   const [amountStr, setAmountStr] = useState(
     existing ? (existing.amount / 100).toFixed(2).replace(".", ",") : ""
   );
-  const [received, setReceived] = useState<boolean>(
-    existing ? !!existing.receivedAt : false
+  const [tag, setTag] = useState<string | undefined>(existing?.tag);
+  const [status, setStatus] = useState<FinanceStatus>(
+    existing?.status ?? (subtype === "ganho" ? "a_pagar" : "a_pagar")
   );
+  const [category, setCategory] = useState<string | undefined>(
+    existing?.category
+  );
+  const [paymentMethod, setPaymentMethod] = useState<
+    PaymentMethodId | undefined
+  >(existing?.paymentMethod);
+  const [receiptUrl, setReceiptUrl] = useState(existing?.receiptUrl ?? "");
+  const [card, setCard] = useState(existing?.card ?? "");
+  const [installments, setInstallments] = useState(
+    existing?.installments ?? ""
+  );
+  const [debtor, setDebtor] = useState(existing?.debtor ?? "");
+  const [totalAmountStr, setTotalAmountStr] = useState(
+    existing?.totalAmount && existing.totalAmount > 0
+      ? (existing.totalAmount / 100).toFixed(2).replace(".", ",")
+      : ""
+  );
+  const [broker, setBroker] = useState(existing?.broker ?? "");
+  const [investmentType, setInvestmentType] = useState(
+    existing?.investmentType ?? ""
+  );
+
   const descRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     descRef.current?.focus();
   }, []);
-
-  // Quando trocar o tipo, ajusta categoria default se a atual não pertence
-  useEffect(() => {
-    const valid = (
-      type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
-    ).some((c) => c.id === category);
-    if (!valid) setCategory(defaultCategory);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -68,19 +81,52 @@ export function FinanceEntryModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const showCategory = subtype === "fixa" || subtype === "variavel";
+  const showStatus = subtype === "fixa" || subtype === "variavel";
+  const showReceived = subtype === "ganho";
+  const showPayment = subtype === "fixa";
+  const showReceipt = subtype === "fixa";
+  const showCard = subtype === "variavel";
+  const showInstallments = subtype === "variavel" || subtype === "divida";
+  const showDebtor = subtype === "divida";
+  const showTotalAmount = subtype === "divida";
+  const showBroker = subtype === "investimento";
+  const showInvestmentType = subtype === "investimento";
+
+  const amountLabel =
+    subtype === "variavel" || subtype === "divida"
+      ? "Valor da parcela"
+      : subtype === "investimento"
+        ? "Valor investido"
+        : "Valor";
+
   function handleSave() {
     const amount = parseBRLInput(amountStr);
     if (amount === 0) return;
-    const desc = description.trim() || (type === "income" ? "Entrada" : "Saída");
+    const desc = description.trim();
+    const totalAmount = parseBRLInput(totalAmountStr);
     const entry: FinanceEntry = {
       id: existing?.id ?? newEntryId(),
-      type,
+      subtype,
       date,
       description: desc,
       amount,
-      category,
-      receivedAt: type === "income" && received ? date : undefined,
+      tag: tag || undefined,
     };
+    if (showStatus) entry.status = status;
+    if (showReceived) entry.status = status;
+    if (showCategory && category) entry.category = category;
+    if (showPayment && paymentMethod) entry.paymentMethod = paymentMethod;
+    if (showReceipt && receiptUrl.trim())
+      entry.receiptUrl = receiptUrl.trim();
+    if (showCard && card.trim()) entry.card = card.trim();
+    if (showInstallments && installments.trim())
+      entry.installments = installments.trim();
+    if (showDebtor && debtor.trim()) entry.debtor = debtor.trim();
+    if (showTotalAmount && totalAmount > 0) entry.totalAmount = totalAmount;
+    if (showBroker && broker) entry.broker = broker;
+    if (showInvestmentType && investmentType)
+      entry.investmentType = investmentType;
     onSave(entry);
   }
 
@@ -94,37 +140,56 @@ export function FinanceEntryModal({
       >
         <header className="day-modal-header">
           <span className="day-modal-eyebrow">
-            {mode === "add" ? "Novo lançamento" : "Editar lançamento"}
+            {isEdit ? "Editar lançamento" : "Novo lançamento"}
           </span>
           <span className="day-modal-title">
-            {type === "income" ? "Entrada" : "Saída"}
+            {SUBTYPES.find((s) => s.id === subtype)?.label}
           </span>
         </header>
 
-        <div className="finance-type-toggle">
-          <button
-            type="button"
-            className={`finance-type-button${type === "income" ? " is-active is-income" : ""}`}
-            onClick={() => setType("income")}
-          >
-            Entrada
-          </button>
-          <button
-            type="button"
-            className={`finance-type-button${type === "expense" ? " is-active is-expense" : ""}`}
-            onClick={() => setType("expense")}
-          >
-            Saída
-          </button>
+        <div className="finance-subtype-grid">
+          {SUBTYPES.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`finance-subtype-button${
+                subtype === s.id ? " is-active" : ""
+              }`}
+              onClick={() => setSubtype(s.id)}
+              style={
+                subtype === s.id
+                  ? {
+                      borderColor: s.color,
+                      color: s.color,
+                      background: `${s.color}1a`,
+                    }
+                  : undefined
+              }
+              disabled={isEdit}
+              title={isEdit ? "O tipo não pode ser alterado depois" : undefined}
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
 
         <div className="finance-field">
-          <label className="finance-field-label">Descrição</label>
+          <label className="finance-field-label">
+            {subtype === "investimento" ? "Produto financeiro" : "Descrição"}
+          </label>
           <input
             ref={descRef}
             type="text"
             className="finance-input"
-            placeholder={type === "income" ? "Ex: Freela design" : "Ex: Mercado"}
+            placeholder={
+              subtype === "investimento"
+                ? "Ex: Tesouro Selic 2029"
+                : subtype === "divida"
+                  ? "Ex: Empréstimo banco"
+                  : subtype === "ganho"
+                    ? "Ex: Freela Joana"
+                    : "Ex: Aluguel"
+            }
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
@@ -132,7 +197,7 @@ export function FinanceEntryModal({
 
         <div className="finance-row">
           <div className="finance-field">
-            <label className="finance-field-label">Valor</label>
+            <label className="finance-field-label">{amountLabel}</label>
             <div className="finance-amount-wrap">
               <span className="finance-amount-prefix">R$</span>
               <input
@@ -146,7 +211,9 @@ export function FinanceEntryModal({
             </div>
           </div>
           <div className="finance-field">
-            <label className="finance-field-label">Data</label>
+            <label className="finance-field-label">
+              {subtype === "investimento" ? "Mês do aporte" : "Data"}
+            </label>
             <input
               type="date"
               className="finance-input finance-date"
@@ -156,50 +223,263 @@ export function FinanceEntryModal({
           </div>
         </div>
 
+        {showTotalAmount && (
+          <div className="finance-field">
+            <label className="finance-field-label">
+              Valor total da dívida
+            </label>
+            <div className="finance-amount-wrap">
+              <span className="finance-amount-prefix">R$</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="finance-input finance-amount"
+                placeholder="0,00"
+                value={totalAmountStr}
+                onChange={(e) => setTotalAmountStr(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Origem (Tag) */}
         <div className="finance-field">
-          <label className="finance-field-label">Categoria</label>
+          <label className="finance-field-label">Origem (tag)</label>
           <div className="finance-category-grid">
-            {categories.map((c) => (
+            <button
+              type="button"
+              className={`finance-category-chip${!tag ? " is-active" : ""}`}
+              onClick={() => setTag(undefined)}
+            >
+              <span
+                className="finance-category-dot"
+                style={{ background: "#5C5C5C" }}
+              />
+              Sem origem
+            </button>
+            {tags.map((t) => (
               <button
-                key={c.id}
+                key={t.id}
                 type="button"
-                className={`finance-category-chip${
-                  category === c.id ? " is-active" : ""
-                }`}
-                onClick={() => setCategory(c.id)}
+                className={`finance-category-chip${tag === t.id ? " is-active" : ""}`}
+                onClick={() => setTag(t.id)}
                 style={
-                  category === c.id
+                  tag === t.id
                     ? {
-                        borderColor: c.color,
-                        color: c.color,
-                        background: `${c.color}1a`,
+                        borderColor: t.color,
+                        color: t.color,
+                        background: `${t.color}1a`,
                       }
                     : undefined
                 }
               >
                 <span
                   className="finance-category-dot"
-                  style={{ background: c.color }}
+                  style={{ background: t.color }}
                 />
-                {c.label}
+                {t.label}
               </button>
             ))}
           </div>
         </div>
 
-        {type === "income" && (
+        {/* Categoria */}
+        {showCategory && (
+          <div className="finance-field">
+            <label className="finance-field-label">Categoria</label>
+            <div className="finance-category-grid">
+              {CATEGORIES.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`finance-category-chip${
+                    category === c.id ? " is-active" : ""
+                  }`}
+                  onClick={() => setCategory(c.id)}
+                  style={
+                    category === c.id
+                      ? {
+                          borderColor: c.color,
+                          color: c.color,
+                          background: `${c.color}1a`,
+                        }
+                      : undefined
+                  }
+                >
+                  <span
+                    className="finance-category-dot"
+                    style={{ background: c.color }}
+                  />
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Status */}
+        {showStatus && (
+          <div className="finance-field">
+            <label className="finance-field-label">Status</label>
+            <div className="finance-status-toggle">
+              <button
+                type="button"
+                className={`finance-status-button${status === "a_pagar" ? " is-active is-pending" : ""}`}
+                onClick={() => setStatus("a_pagar")}
+              >
+                A pagar
+              </button>
+              <button
+                type="button"
+                className={`finance-status-button${status === "pago" ? " is-active is-paid" : ""}`}
+                onClick={() => setStatus("pago")}
+              >
+                Pago
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Forma de pagamento */}
+        {showPayment && (
+          <div className="finance-field">
+            <label className="finance-field-label">Forma de pagamento</label>
+            <div className="finance-category-grid">
+              {PAYMENT_METHODS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`finance-category-chip${
+                    paymentMethod === p.id ? " is-active" : ""
+                  }`}
+                  onClick={() => setPaymentMethod(p.id)}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recibo URL */}
+        {showReceipt && (
+          <div className="finance-field">
+            <label className="finance-field-label">Recibo (link)</label>
+            <input
+              type="url"
+              className="finance-input"
+              placeholder="https://..."
+              value={receiptUrl}
+              onChange={(e) => setReceiptUrl(e.target.value)}
+            />
+          </div>
+        )}
+
+        {/* Cartão */}
+        {showCard && (
+          <div className="finance-row">
+            <div className="finance-field">
+              <label className="finance-field-label">Qual cartão?</label>
+              <input
+                type="text"
+                className="finance-input"
+                placeholder="Ex: Nubank, Itaú…"
+                value={card}
+                onChange={(e) => setCard(e.target.value)}
+              />
+            </div>
+            <div className="finance-field">
+              <label className="finance-field-label">Nº de parcelas</label>
+              <input
+                type="text"
+                className="finance-input"
+                placeholder="Ex: 3/12 ou única"
+                value={installments}
+                onChange={(e) => setInstallments(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Dívida */}
+        {showDebtor && (
+          <div className="finance-row">
+            <div className="finance-field">
+              <label className="finance-field-label">
+                Para quem está devendo?
+              </label>
+              <input
+                type="text"
+                className="finance-input"
+                placeholder="Ex: Banco X"
+                value={debtor}
+                onChange={(e) => setDebtor(e.target.value)}
+              />
+            </div>
+            <div className="finance-field">
+              <label className="finance-field-label">Nº de parcelas</label>
+              <input
+                type="text"
+                className="finance-input"
+                placeholder="Ex: 5/24"
+                value={installments}
+                onChange={(e) => setInstallments(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Investimento */}
+        {showBroker && (
+          <div className="finance-field">
+            <label className="finance-field-label">Corretora</label>
+            <div className="finance-category-grid">
+              {BROKERS.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  className={`finance-category-chip${broker === b.id ? " is-active" : ""}`}
+                  onClick={() => setBroker(b.id)}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {showInvestmentType && (
+          <div className="finance-field">
+            <label className="finance-field-label">Tipo de investimento</label>
+            <div className="finance-category-grid">
+              {INVESTMENT_TYPES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`finance-category-chip${investmentType === t.id ? " is-active" : ""}`}
+                  onClick={() => setInvestmentType(t.id)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Já recebida (ganho) */}
+        {showReceived && (
           <label className="finance-checkbox">
             <input
               type="checkbox"
-              checked={received}
-              onChange={(e) => setReceived(e.target.checked)}
+              checked={status === "pago"}
+              onChange={(e) => setStatus(e.target.checked ? "pago" : "a_pagar")}
             />
             <span>Já recebida</span>
           </label>
         )}
 
         <div className="day-modal-actions">
-          {mode === "edit" && onDelete && (
+          {isEdit && onDelete && (
             <button
               type="button"
               className="day-modal-action day-modal-action--secondary"
@@ -220,13 +500,8 @@ export function FinanceEntryModal({
             className="day-modal-action day-modal-action--primary"
             onClick={handleSave}
             disabled={parseBRLInput(amountStr) === 0}
-            title={
-              parseBRLInput(amountStr) === 0
-                ? "Informe um valor maior que zero"
-                : undefined
-            }
           >
-            {mode === "add" ? "Adicionar" : "Salvar"}
+            {isEdit ? "Salvar" : "Adicionar"}
           </button>
         </div>
 
