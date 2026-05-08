@@ -738,6 +738,7 @@ function AnnualView({
               <th>Fixos</th>
               <th>Variáveis</th>
               <th>Dívidas</th>
+              <th>Investimentos</th>
               <th>Balanço</th>
             </tr>
           </thead>
@@ -768,6 +769,13 @@ function AnnualView({
                   </td>
                   <td
                     className={
+                      m.summary.investimentos > 0 ? "is-investment" : ""
+                    }
+                  >
+                    {formatBRL(m.summary.investimentos)}
+                  </td>
+                  <td
+                    className={
                       m.summary.balanco > 0
                         ? "is-positive"
                         : m.summary.balanco < 0
@@ -788,6 +796,9 @@ function AnnualView({
               <td>{formatBRL(total.fixos)}</td>
               <td>{formatBRL(total.variaveis)}</td>
               <td>{formatBRL(total.dividas)}</td>
+              <td className="is-investment">
+                {formatBRL(total.investimentos)}
+              </td>
               <td
                 className={
                   total.balanco > 0
