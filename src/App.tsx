@@ -11,6 +11,7 @@ import { ReferenceGallery } from "./components/ReferenceGallery";
 import { Pipeline } from "./components/Pipeline";
 import { WorkCalendar } from "./components/WorkCalendar";
 import { PasswordGate } from "./components/PasswordGate";
+import { ProfileGate, type Profile } from "./components/ProfileGate";
 import { CATEGORIES, findRoute } from "./routes";
 
 function getPageFromHash(): string {
@@ -26,7 +27,7 @@ function navigate(id: string) {
   }
 }
 
-function Page({ id }: { id: string }) {
+function Page({ id, profile }: { id: string; profile: Profile }) {
   const route = findRoute(id);
   if (!route) return null;
   const cat = CATEGORIES.find((c) => c.id === route.category)?.label;
@@ -61,10 +62,22 @@ function Page({ id }: { id: string }) {
       body = <Pipeline />;
       break;
     case "calendario":
-      body = <WorkCalendar personId="ane" mode="salary" />;
+      body = (
+        <WorkCalendar
+          personId="ane"
+          mode="salary"
+          readOnly={profile !== "ane"}
+        />
+      );
       break;
     case "calendario-thais":
-      body = <WorkCalendar personId="thais" mode="tasks" />;
+      body = (
+        <WorkCalendar
+          personId="thais"
+          mode="tasks"
+          readOnly={profile !== "thais"}
+        />
+      );
       break;
   }
 
@@ -90,18 +103,27 @@ function App() {
 
   return (
     <PasswordGate>
-      <div className="app-shell notranslate" translate="no">
-        <Sidebar current={page} onNavigate={navigate} />
-        <main className="content-area">
-          <div className="content-inner">
-            {page === "home" ? (
-              <HomePage onNavigate={navigate} />
-            ) : (
-              <Page id={page} />
-            )}
+      <ProfileGate>
+        {(profile, switchProfile) => (
+          <div className="app-shell notranslate" translate="no">
+            <Sidebar
+              current={page}
+              onNavigate={navigate}
+              profile={profile}
+              onSwitchProfile={switchProfile}
+            />
+            <main className="content-area">
+              <div className="content-inner">
+                {page === "home" ? (
+                  <HomePage onNavigate={navigate} />
+                ) : (
+                  <Page id={page} profile={profile} />
+                )}
+              </div>
+            </main>
           </div>
-        </main>
-      </div>
+        )}
+      </ProfileGate>
     </PasswordGate>
   );
 }

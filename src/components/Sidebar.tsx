@@ -4,13 +4,21 @@ import {
   EditSolidIcon,
 } from "@overlens/legacy-icons";
 import { CATEGORIES, EXTERNAL_LINKS, ROUTES } from "../routes";
+import { PROFILE_LABELS, type Profile } from "./ProfileGate";
 
 interface SidebarProps {
   current: string;
   onNavigate: (id: string) => void;
+  profile: Profile;
+  onSwitchProfile: () => void;
 }
 
-export function Sidebar({ current, onNavigate }: SidebarProps) {
+export function Sidebar({
+  current,
+  onNavigate,
+  profile,
+  onSwitchProfile,
+}: SidebarProps) {
   const [search, setSearch] = useState("");
   const [openCats, setOpenCats] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -133,6 +141,17 @@ export function Sidebar({ current, onNavigate }: SidebarProps) {
         </nav>
 
         <div className="sidebar-divider" />
+
+        <button
+          type="button"
+          className="profile-chip"
+          onClick={onSwitchProfile}
+          title="Trocar perfil"
+        >
+          <span className="profile-chip-label">Você é</span>
+          <span className="profile-chip-name">{PROFILE_LABELS[profile]}</span>
+          <span className="profile-chip-action">trocar</span>
+        </button>
 
         <div className="sidebar-external">
           {EXTERNAL_LINKS.map((link) => (

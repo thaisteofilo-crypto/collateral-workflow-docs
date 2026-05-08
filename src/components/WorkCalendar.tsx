@@ -445,9 +445,11 @@ export type CalendarMode = "salary" | "tasks";
 export function WorkCalendar({
   personId = "ane",
   mode = "salary",
+  readOnly = false,
 }: {
   personId?: string;
   mode?: CalendarMode;
+  readOnly?: boolean;
 } = {}) {
   const storage = PERSON_STORAGE[personId] ?? PERSON_STORAGE.ane;
   const showSalary = mode === "salary";
@@ -633,6 +635,7 @@ export function WorkCalendar({
   const totalEarnings = totalCount * DAILY_RATE;
 
   function openDay(day: number) {
+    if (readOnly) return;
     if (isMonthClosed(viewYear, viewMonth) && !isAdmin) return;
     const key = toKey(viewYear, viewMonth, day);
     const initial = workdays.get(key) ?? { ...ZERO_ENTRY };
@@ -676,6 +679,7 @@ export function WorkCalendar({
   }
 
   async function togglePaid(monthKey: string) {
+    if (readOnly) return;
     if (!isAdmin) return;
     const isPaid = paidMonths.has(monthKey);
     const action: "add" | "remove" = isPaid ? "remove" : "add";
@@ -782,6 +786,18 @@ export function WorkCalendar({
 
   return (
     <>
+      {readOnly && (
+        <div className="readonly-banner">
+          <span className="readonly-banner-icon" aria-hidden>
+            ◐
+          </span>
+          <span>
+            Você está vendo o calendário de outra pessoa. Pra editar,
+            troque seu perfil na barra lateral.
+          </span>
+        </div>
+      )}
+
       <div className="step-card" style={{ gap: 18 }}>
         <div
           style={{
@@ -847,7 +863,7 @@ export function WorkCalendar({
               viewMonth === today.getMonth() &&
               viewYear === today.getFullYear();
             const closed = isMonthClosed(viewYear, viewMonth);
-            const locked = closed && !isAdmin;
+            const locked = (closed && !isAdmin) || readOnly;
             return (
               <button
                 key={i}
@@ -855,9 +871,11 @@ export function WorkCalendar({
                 onClick={() => openDay(d)}
                 disabled={locked}
                 title={
-                  locked
-                    ? "Mês fechado — destrave o modo admin para corrigir"
-                    : "Clique para registrar o trabalho do dia"
+                  readOnly
+                    ? "Somente leitura — troque seu perfil para editar"
+                    : closed && !isAdmin
+                      ? "Mês fechado — destrave o modo admin para corrigir"
+                      : "Clique para registrar o trabalho do dia"
                 }
                 className={`cal-cell${isWorked ? " cal-cell--worked" : ""}${
                   isToday ? " cal-cell--today" : ""
@@ -881,9 +899,9 @@ export function WorkCalendar({
           }}
         >
           <span>
-            Clique em um dia para registrar capas, internas, resumos e ajustes.
-            Meses passados ficam travados — destrave o modo admin para
-            corrigir.
+            {readOnly
+              ? "Visualização somente leitura — troque o perfil para editar este calendário."
+              : "Clique em um dia para registrar capas, internas, resumos e ajustes. Meses passados ficam travados — destrave o modo admin para corrigir."}
           </span>
           <span
             style={{
@@ -991,24 +1009,26 @@ export function WorkCalendar({
               >
                 Por mês
               </span>
-              <button
-                type="button"
-                onClick={isAdmin ? lockAdmin : unlockAdmin}
-                className="admin-toggle"
-                title={
-                  isAdmin
-                    ? "Travar (sair do modo admin)"
-                    : showSalary
-                      ? "Destravar pagamento (modo admin)"
-                      : "Destravar edição de meses passados"
-                }
-              >
-                {isAdmin
-                  ? showSalary
-                    ? "Travar pagamento"
-                    : "Travar edição"
-                  : "Modo admin"}
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={isAdmin ? lockAdmin : unlockAdmin}
+                  className="admin-toggle"
+                  title={
+                    isAdmin
+                      ? "Travar (sair do modo admin)"
+                      : showSalary
+                        ? "Destravar pagamento (modo admin)"
+                        : "Destravar edição de meses passados"
+                  }
+                >
+                  {isAdmin
+                    ? showSalary
+                      ? "Travar pagamento"
+                      : "Travar edição"
+                    : "Modo admin"}
+                </button>
+              )}
             </div>
             {monthlyBreakdown.map((m) => {
               const isCurrent =
