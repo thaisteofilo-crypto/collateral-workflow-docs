@@ -4,17 +4,53 @@ import {
   ArrowForwardIosLineIcon,
 } from "@overlens/legacy-icons";
 
-const STORAGE_KEY = "collateral.workdays.v1";
+const STORAGE_KEY = "collateral.workdays.v2";
+const STORAGE_KEY_LEGACY = "collateral.workdays.v1";
 const PAID_KEY = "collateral.paidmonths.v1";
 const ADMIN_FLAG = "collateral.admin.v1";
 const ADMIN_PWD_KEY = "collateral.admin.pwd.v1";
 
 const MONTHLY_SALARY = 2100;
 const DAYS_PER_MONTH = 20;
-const COVERS_PER_DAY = 2;
 const DAILY_RATE = MONTHLY_SALARY / DAYS_PER_MONTH;
 
 const POLL_INTERVAL_MS = 5000;
+
+type DayEntry = {
+  capas: number;
+  internas: number;
+  resumos: number;
+  ajustes: number;
+};
+
+const ZERO_ENTRY: DayEntry = {
+  capas: 0,
+  internas: 0,
+  resumos: 0,
+  ajustes: 0,
+};
+
+const LEGACY_ENTRY: DayEntry = {
+  capas: 2,
+  internas: 0,
+  resumos: 0,
+  ajustes: 0,
+};
+
+const ENTRY_FIELDS: Array<{ key: keyof DayEntry; label: string }> = [
+  { key: "capas", label: "Capas" },
+  { key: "internas", label: "Capas internas" },
+  { key: "resumos", label: "Resumos" },
+  { key: "ajustes", label: "Ajustes" },
+];
+
+function entryTotal(e: DayEntry): number {
+  return e.capas + e.internas + e.resumos + e.ajustes;
+}
+
+function isEntryEmpty(e: DayEntry): boolean {
+  return entryTotal(e) === 0;
+}
 
 function isMonthClosed(year: number, month: number): boolean {
   const now = new Date();
@@ -38,6 +74,15 @@ const BRL = new Intl.NumberFormat("pt-BR", {
 });
 
 const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
+const FULL_WEEKDAYS = [
+  "domingo",
+  "segunda",
+  "terça",
+  "quarta",
+  "quinta",
+  "sexta",
+  "sábado",
+];
 const MONTHS = [
   "Janeiro",
   "Fevereiro",
@@ -57,9 +102,66 @@ function toKey(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-function loadCache(key: string): Set<string> {
+function normalizeEntry(raw: unknown): DayEntry {
+  if (!raw || typeof raw !== "object") return { ...ZERO_ENTRY };
+  const r = raw as Record<string, unknown>;
+  const num = (v: unknown) => {
+    const n = Math.floor(Number(v ?? 0));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+  return {
+    capas: num(r.capas),
+    internas: num(r.internas),
+    resumos: num(r.resumos),
+    ajustes: num(r.ajustes),
+  };
+}
+
+function loadWorkdaysCache(): Map<string, DayEntry> {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const m = new Map<string, DayEntry>();
+        for (const [k, v] of Object.entries(parsed)) {
+          const e = normalizeEntry(v);
+          if (!isEntryEmpty(e)) m.set(k, e);
+        }
+        return m;
+      }
+    }
+    // Legado: array de strings (v1)
+    const legacy = localStorage.getItem(STORAGE_KEY_LEGACY);
+    if (legacy) {
+      const parsed = JSON.parse(legacy);
+      if (Array.isArray(parsed)) {
+        const m = new Map<string, DayEntry>();
+        for (const k of parsed) {
+          if (typeof k === "string") m.set(k, { ...LEGACY_ENTRY });
+        }
+        return m;
+      }
+    }
+    return new Map();
+  } catch {
+    return new Map();
+  }
+}
+
+function saveWorkdaysCache(map: Map<string, DayEntry>) {
+  try {
+    const obj: Record<string, DayEntry> = {};
+    for (const [k, v] of map) obj[k] = v;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+  } catch {
+    // ignore
+  }
+}
+
+function loadPaidCache(): Set<string> {
+  try {
+    const raw = localStorage.getItem(PAID_KEY);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? new Set(parsed) : new Set();
@@ -68,28 +170,43 @@ function loadCache(key: string): Set<string> {
   }
 }
 
-function saveCache(key: string, set: Set<string>) {
+function savePaidCache(set: Set<string>) {
   try {
-    localStorage.setItem(key, JSON.stringify(Array.from(set)));
+    localStorage.setItem(PAID_KEY, JSON.stringify(Array.from(set)));
   } catch {
     // ignore
   }
 }
 
-async function fetchWorkdays(signal?: AbortSignal): Promise<string[]> {
+async function fetchWorkdays(
+  signal?: AbortSignal
+): Promise<Record<string, DayEntry>> {
   const res = await fetch("/api/workdays", { signal, cache: "no-store" });
   if (!res.ok) throw new Error("Falha ao carregar dias");
-  return (await res.json()) as string[];
+  const data = (await res.json()) as Record<string, unknown>;
+  const out: Record<string, DayEntry> = {};
+  for (const [k, v] of Object.entries(data)) {
+    out[k] = normalizeEntry(v);
+  }
+  return out;
 }
 
-async function postWorkday(day: string, action: "add" | "remove"): Promise<string[]> {
+async function postWorkday(
+  day: string,
+  entry: DayEntry
+): Promise<Record<string, DayEntry>> {
   const res = await fetch("/api/workdays", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ day, action }),
+    body: JSON.stringify({ day, entry }),
   });
   if (!res.ok) throw new Error("Falha ao salvar dia");
-  return (await res.json()) as string[];
+  const data = (await res.json()) as Record<string, unknown>;
+  const out: Record<string, DayEntry> = {};
+  for (const [k, v] of Object.entries(data)) {
+    out[k] = normalizeEntry(v);
+  }
+  return out;
 }
 
 async function fetchPaidMonths(signal?: AbortSignal): Promise<string[]> {
@@ -140,20 +257,170 @@ async function postAdminAuth(password: string): Promise<boolean> {
   return res.ok;
 }
 
+function recordToMap(rec: Record<string, DayEntry>): Map<string, DayEntry> {
+  const m = new Map<string, DayEntry>();
+  for (const [k, v] of Object.entries(rec)) {
+    if (!isEntryEmpty(v)) m.set(k, v);
+  }
+  return m;
+}
+
+type EditingDay = {
+  day: number;
+  key: string;
+  initial: DayEntry;
+};
+
+function DayEditModal({
+  day,
+  weekday,
+  monthLabel,
+  initial,
+  onClose,
+  onSave,
+}: {
+  day: number;
+  weekday: string;
+  monthLabel: string;
+  initial: DayEntry;
+  onClose: () => void;
+  onSave: (entry: DayEntry) => void;
+}) {
+  const [entry, setEntry] = useState<DayEntry>(initial);
+  const firstInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    firstInputRef.current?.focus();
+    firstInputRef.current?.select();
+  }, []);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const total = entryTotal(entry);
+  const wasEmpty = isEntryEmpty(initial);
+  const isEmpty = isEntryEmpty(entry);
+
+  function setField(key: keyof DayEntry, value: number) {
+    const v = Math.max(0, Math.floor(value) || 0);
+    setEntry((prev) => ({ ...prev, [key]: v }));
+  }
+
+  return (
+    <div className="day-modal-overlay" onClick={onClose}>
+      <div
+        className="day-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <header className="day-modal-header">
+          <span className="day-modal-eyebrow">Dia trabalhado</span>
+          <span className="day-modal-title">
+            {day} de {monthLabel}{" "}
+            <span className="day-modal-title-weekday">· {weekday}</span>
+          </span>
+        </header>
+
+        <div className="day-modal-fields">
+          {ENTRY_FIELDS.map((field, i) => (
+            <div className="day-modal-row" key={field.key}>
+              <span className="day-modal-label">{field.label}</span>
+              <div className="day-modal-stepper">
+                <button
+                  type="button"
+                  className="day-modal-step"
+                  onClick={() => setField(field.key, entry[field.key] - 1)}
+                  disabled={entry[field.key] === 0}
+                  aria-label={`Diminuir ${field.label.toLowerCase()}`}
+                >
+                  −
+                </button>
+                <input
+                  ref={i === 0 ? firstInputRef : undefined}
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  className="day-modal-input"
+                  value={entry[field.key]}
+                  onChange={(e) =>
+                    setField(field.key, parseInt(e.target.value || "0", 10))
+                  }
+                  onFocus={(e) => e.target.select()}
+                />
+                <button
+                  type="button"
+                  className="day-modal-step"
+                  onClick={() => setField(field.key, entry[field.key] + 1)}
+                  aria-label={`Aumentar ${field.label.toLowerCase()}`}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="day-modal-summary">
+          <span>Total do dia</span>
+          <span className="day-modal-summary-value">
+            {total === 0
+              ? "—"
+              : `${total} ${total === 1 ? "item" : "itens"}`}
+          </span>
+        </div>
+
+        <div className="day-modal-actions">
+          {!wasEmpty && (
+            <button
+              type="button"
+              className="day-modal-action day-modal-action--secondary"
+              onClick={() => onSave({ ...ZERO_ENTRY })}
+            >
+              Limpar dia
+            </button>
+          )}
+          <button
+            type="button"
+            className="day-modal-action day-modal-action--ghost"
+            onClick={onClose}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="day-modal-action day-modal-action--primary"
+            onClick={() => onSave(entry)}
+            disabled={isEmpty && wasEmpty}
+          >
+            Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function WorkCalendar() {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
-  const [workdays, setWorkdays] = useState<Set<string>>(() =>
-    loadCache(STORAGE_KEY)
+  const [workdays, setWorkdays] = useState<Map<string, DayEntry>>(() =>
+    loadWorkdaysCache()
   );
   const [paidMonths, setPaidMonths] = useState<Set<string>>(() =>
-    loadCache(PAID_KEY)
+    loadPaidCache()
   );
   const [syncStatus, setSyncStatus] = useState<
     "idle" | "syncing" | "online" | "offline"
   >("idle");
   const [isAdmin, setIsAdmin] = useState<boolean>(loadAdmin);
+  const [editing, setEditing] = useState<EditingDay | null>(null);
 
   async function unlockAdmin() {
     const input = window.prompt("Senha admin:");
@@ -192,11 +459,11 @@ export function WorkCalendar() {
 
   // Cache locally whenever state changes
   useEffect(() => {
-    saveCache(STORAGE_KEY, workdays);
+    saveWorkdaysCache(workdays);
   }, [workdays]);
 
   useEffect(() => {
-    saveCache(PAID_KEY, paidMonths);
+    savePaidCache(paidMonths);
   }, [paidMonths]);
 
   // Initial load + polling
@@ -215,32 +482,46 @@ export function WorkCalendar() {
         if (cancelled) return;
         if (pendingWrites.current > 0) return;
 
-        let workdaySet = new Set(days);
-        let paidSet = new Set(paid);
+        let workdayMap = recordToMap(days);
+        const paidSet = new Set(paid);
 
         if (initial) {
-          // One-shot: Abril/2026 (20 dias úteis) foi sobrescrito pelo KV sync
-          // vazio. Restaura os dias uma vez por browser. O flag "Pago" é
-          // marcado manualmente via modo admin (não é mais auto-restaurado).
-          const flag = "collateral.paidmonths.bootstrap.v3";
+          // One-shot: Abril/2026 (20 dias úteis) precisou ser restaurado
+          // após o KV ter sido sobrescrito vazio. Faz o restore uma vez por
+          // browser, com a regra histórica de 2 capas/dia.
+          const flag = "collateral.paidmonths.bootstrap.v4";
           if (!localStorage.getItem(flag)) {
-            // Dias úteis de Abril/2026, exceto 21/04 (Tiradentes).
             const aprilWorkdays = [
-              "2026-04-01", "2026-04-02", "2026-04-03",
-              "2026-04-06", "2026-04-07", "2026-04-08", "2026-04-09", "2026-04-10",
-              "2026-04-13", "2026-04-14", "2026-04-15", "2026-04-16", "2026-04-17",
+              "2026-04-01",
+              "2026-04-02",
+              "2026-04-03",
+              "2026-04-06",
+              "2026-04-07",
+              "2026-04-08",
+              "2026-04-09",
+              "2026-04-10",
+              "2026-04-13",
+              "2026-04-14",
+              "2026-04-15",
+              "2026-04-16",
+              "2026-04-17",
               "2026-04-20",
-              "2026-04-22", "2026-04-23", "2026-04-24",
-              "2026-04-27", "2026-04-28", "2026-04-29",
+              "2026-04-22",
+              "2026-04-23",
+              "2026-04-24",
+              "2026-04-27",
+              "2026-04-28",
+              "2026-04-29",
             ];
             try {
               const dayPosts = aprilWorkdays
-                .filter((d) => !workdaySet.has(d))
-                .map((d) => postWorkday(d, "add"));
-              await Promise.all(dayPosts);
-
-              const freshDays = await fetchWorkdays(controller.signal);
-              workdaySet = new Set(freshDays);
+                .filter((d) => !workdayMap.has(d))
+                .map((d) => postWorkday(d, { ...LEGACY_ENTRY }));
+              if (dayPosts.length > 0) {
+                await Promise.all(dayPosts);
+                const fresh = await fetchWorkdays(controller.signal);
+                workdayMap = recordToMap(fresh);
+              }
               localStorage.setItem(flag, "1");
             } catch {
               // tenta de novo no próximo mount
@@ -248,7 +529,7 @@ export function WorkCalendar() {
           }
         }
 
-        setWorkdays(workdaySet);
+        setWorkdays(workdayMap);
         setPaidMonths(paidSet);
         setSyncStatus("online");
       } catch (err) {
@@ -276,44 +557,62 @@ export function WorkCalendar() {
 
   const monthCount = useMemo(() => {
     let count = 0;
-    for (const key of workdays) {
-      if (
-        key.startsWith(`${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`)
-      ) {
-        count++;
-      }
+    const prefix = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
+    for (const key of workdays.keys()) {
+      if (key.startsWith(prefix)) count++;
     }
     return count;
   }, [workdays, viewYear, viewMonth]);
 
-  const totalCount = workdays.size;
+  const totals = useMemo(() => {
+    const acc: DayEntry = { ...ZERO_ENTRY };
+    for (const e of workdays.values()) {
+      acc.capas += e.capas;
+      acc.internas += e.internas;
+      acc.resumos += e.resumos;
+      acc.ajustes += e.ajustes;
+    }
+    return acc;
+  }, [workdays]);
 
-  async function toggle(day: number) {
+  const totalCount = workdays.size;
+  const totalEarnings = totalCount * DAILY_RATE;
+
+  function openDay(day: number) {
     if (isMonthClosed(viewYear, viewMonth) && !isAdmin) return;
     const key = toKey(viewYear, viewMonth, day);
-    const isWorked = workdays.has(key);
-    const action: "add" | "remove" = isWorked ? "remove" : "add";
+    const initial = workdays.get(key) ?? { ...ZERO_ENTRY };
+    setEditing({ day, key, initial });
+  }
+
+  async function saveDay(entry: DayEntry) {
+    if (!editing) return;
+    const { key, initial } = editing;
+    const nextEntry = normalizeEntry(entry);
+    const prevEntry = initial;
+
+    setEditing(null);
 
     // Optimistic update
     setWorkdays((prev) => {
-      const next = new Set(prev);
-      if (isWorked) next.delete(key);
-      else next.add(key);
+      const next = new Map(prev);
+      if (isEntryEmpty(nextEntry)) next.delete(key);
+      else next.set(key, nextEntry);
       return next;
     });
 
     pendingWrites.current += 1;
     setSyncStatus("syncing");
     try {
-      const days = await postWorkday(key, action);
-      setWorkdays(new Set(days));
+      const days = await postWorkday(key, nextEntry);
+      setWorkdays(recordToMap(days));
       setSyncStatus("online");
     } catch {
       // Revert on error
       setWorkdays((prev) => {
-        const next = new Set(prev);
-        if (isWorked) next.add(key);
-        else next.delete(key);
+        const next = new Map(prev);
+        if (isEntryEmpty(prevEntry)) next.delete(key);
+        else next.set(key, prevEntry);
         return next;
       });
       setSyncStatus("offline");
@@ -379,18 +678,28 @@ export function WorkCalendar() {
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const totalCovers = totalCount * COVERS_PER_DAY;
-  const totalEarnings = totalCount * DAILY_RATE;
-
   const monthlyBreakdown = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const key of workdays) {
+    type Acc = DayEntry & { days: number };
+    const map = new Map<string, Acc>();
+    for (const [key, entry] of workdays) {
       const monthKey = key.slice(0, 7);
-      map.set(monthKey, (map.get(monthKey) ?? 0) + 1);
+      const acc = map.get(monthKey) ?? {
+        days: 0,
+        capas: 0,
+        internas: 0,
+        resumos: 0,
+        ajustes: 0,
+      };
+      acc.days += 1;
+      acc.capas += entry.capas;
+      acc.internas += entry.internas;
+      acc.resumos += entry.resumos;
+      acc.ajustes += entry.ajustes;
+      map.set(monthKey, acc);
     }
     return Array.from(map.entries())
       .sort((a, b) => b[0].localeCompare(a[0]))
-      .map(([key, days]) => {
+      .map(([key, acc]) => {
         const [yearStr, monthStr] = key.split("-");
         const y = Number(yearStr);
         const m = Number(monthStr) - 1;
@@ -399,8 +708,12 @@ export function WorkCalendar() {
           year: y,
           month: m,
           label: `${MONTHS[m]} ${y}`,
-          days,
-          earnings: days * DAILY_RATE,
+          days: acc.days,
+          capas: acc.capas,
+          internas: acc.internas,
+          resumos: acc.resumos,
+          ajustes: acc.ajustes,
+          earnings: acc.days * DAILY_RATE,
           paid: paidMonths.has(key),
         };
       });
@@ -410,6 +723,8 @@ export function WorkCalendar() {
     .filter((m) => m.paid)
     .reduce((sum, m) => sum + m.earnings, 0);
   const pendingEarnings = totalEarnings - paidEarnings;
+
+  const hasItems = entryTotal(totals) > 0;
 
   return (
     <>
@@ -483,12 +798,12 @@ export function WorkCalendar() {
               <button
                 key={i}
                 type="button"
-                onClick={() => toggle(d)}
+                onClick={() => openDay(d)}
                 disabled={locked}
                 title={
                   locked
                     ? "Mês fechado — destrave o modo admin para corrigir"
-                    : undefined
+                    : "Clique para registrar o trabalho do dia"
                 }
                 className={`cal-cell${isWorked ? " cal-cell--worked" : ""}${
                   isToday ? " cal-cell--today" : ""
@@ -512,8 +827,9 @@ export function WorkCalendar() {
           }}
         >
           <span>
-            Clique em um dia para marcar/desmarcar. Meses passados ficam
-            travados — destrave o modo admin para corrigir.
+            Clique em um dia para registrar capas, internas, resumos e ajustes.
+            Meses passados ficam travados — destrave o modo admin para
+            corrigir.
           </span>
           <span
             style={{
@@ -521,10 +837,7 @@ export function WorkCalendar() {
               fontWeight: 500,
               textTransform: "uppercase",
               letterSpacing: "0.08em",
-              color:
-                syncStatus === "offline"
-                  ? "var(--text-tertiary)"
-                  : "var(--text-tertiary)",
+              color: "var(--text-tertiary)",
               opacity: syncStatus === "syncing" ? 0.6 : 1,
               whiteSpace: "nowrap",
             }}
@@ -548,9 +861,11 @@ export function WorkCalendar() {
           <span className="salary-meta">acumulado</span>
         </div>
         <div className="salary-item">
-          <span className="salary-label">Capas produzidas</span>
-          <span className="salary-value">{totalCovers}</span>
-          <span className="salary-meta">{COVERS_PER_DAY} por dia</span>
+          <span className="salary-label">Itens entregues</span>
+          <span className="salary-value">{entryTotal(totals)}</span>
+          <span className="salary-meta">
+            {hasItems ? "soma de todos os tipos" : "nenhum registro ainda"}
+          </span>
         </div>
         <div className="salary-item salary-item--accent">
           <span className="salary-label">Salário acumulado</span>
@@ -562,6 +877,17 @@ export function WorkCalendar() {
           </span>
         </div>
       </div>
+
+      {hasItems && (
+        <div className="metrics-grid">
+          {ENTRY_FIELDS.map((f) => (
+            <div className="metric-item" key={f.key}>
+              <span className="metric-label">{f.label}</span>
+              <span className="metric-value">{totals[f.key]}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {monthlyBreakdown.length > 0 && (
         <>
@@ -616,6 +942,8 @@ export function WorkCalendar() {
             {monthlyBreakdown.map((m) => {
               const isCurrent =
                 m.year === viewYear && m.month === viewMonth;
+              const hasItemsRow =
+                m.capas + m.internas + m.resumos + m.ajustes > 0;
               return (
                 <div
                   key={m.key}
@@ -633,8 +961,10 @@ export function WorkCalendar() {
                   >
                     <span className="month-row-label">{m.label}</span>
                     <span className="month-row-days">
-                      {m.days} {m.days === 1 ? "dia" : "dias"} ·{" "}
-                      {m.days * COVERS_PER_DAY} capas
+                      {m.days} {m.days === 1 ? "dia" : "dias"}
+                      {hasItemsRow
+                        ? ` · ${m.capas} cap · ${m.internas} int · ${m.resumos} res · ${m.ajustes} aj`
+                        : ""}
                     </span>
                   </button>
                   <span className="month-row-value">
@@ -668,6 +998,21 @@ export function WorkCalendar() {
             })}
           </div>
         </>
+      )}
+
+      {editing && (
+        <DayEditModal
+          day={editing.day}
+          weekday={
+            FULL_WEEKDAYS[
+              new Date(viewYear, viewMonth, editing.day).getDay()
+            ]
+          }
+          monthLabel={`${MONTHS[viewMonth]} ${viewYear}`}
+          initial={editing.initial}
+          onClose={() => setEditing(null)}
+          onSave={saveDay}
+        />
       )}
     </>
   );
