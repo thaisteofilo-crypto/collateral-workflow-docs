@@ -155,8 +155,17 @@ export function FinanceEntryModal({
           >
             {SUBTYPES.find((s) => s.id === subtype)?.label}
           </span>
+          <button
+            type="button"
+            className="finance-modal-close"
+            onClick={onClose}
+            aria-label="Fechar"
+          >
+            ×
+          </button>
         </header>
 
+        <div className="finance-modal-body">
         <div className="finance-subtype-grid">
           {SUBTYPES.map((s) => (
             <button
@@ -476,38 +485,41 @@ export function FinanceEntryModal({
           </div>
         )}
 
-        <div className="day-modal-actions">
-          {isEdit && onDelete && (
-            <button
-              type="button"
-              className="day-modal-action day-modal-action--secondary"
-              onClick={onDelete}
-            >
-              Excluir
-            </button>
-          )}
-          <button
-            type="button"
-            className="day-modal-action day-modal-action--ghost"
-            onClick={onClose}
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            className="day-modal-action day-modal-action--primary"
-            onClick={handleSave}
-            disabled={parseBRLInput(amountStr) === 0}
-          >
-            {isEdit ? "Salvar" : "Adicionar"}
-          </button>
         </div>
 
-        {parseBRLInput(amountStr) > 0 && (
-          <div className="finance-modal-preview">
-            {formatBRL(parseBRLInput(amountStr))}
+        <div className="finance-modal-footer">
+          {parseBRLInput(amountStr) > 0 && (
+            <span className="finance-modal-preview">
+              Total: <strong>{formatBRL(parseBRLInput(amountStr))}</strong>
+            </span>
+          )}
+          <div className="day-modal-actions">
+            {isEdit && onDelete && (
+              <button
+                type="button"
+                className="day-modal-action day-modal-action--secondary"
+                onClick={onDelete}
+              >
+                Excluir
+              </button>
+            )}
+            <button
+              type="button"
+              className="day-modal-action day-modal-action--ghost"
+              onClick={onClose}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="day-modal-action day-modal-action--primary"
+              onClick={handleSave}
+              disabled={parseBRLInput(amountStr) === 0}
+            >
+              {isEdit ? "Salvar" : "Adicionar"}
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
