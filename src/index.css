@@ -1067,24 +1067,28 @@ a {
 .finance-subtype-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 4px;
-  margin-bottom: 14px;
+  gap: 6px;
+  margin-bottom: 18px;
 }
 .finance-subtype-button {
-  padding: 8px 6px;
+  padding: 10px 6px;
   border: 1px solid var(--border-default);
   background: var(--surface-overlay);
   color: var(--text-secondary);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
   white-space: nowrap;
 }
 .finance-subtype-button:hover:not(:disabled) {
   color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+.finance-subtype-button.is-active {
+  font-weight: 600;
 }
 .finance-subtype-button:disabled {
   opacity: 0.6;
@@ -1092,7 +1096,7 @@ a {
 }
 @media (max-width: 600px) {
   .finance-subtype-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -1306,7 +1310,8 @@ a {
 
 /* ---- Finance modal extras ---- */
 .finance-modal {
-  max-width: 460px;
+  max-width: 480px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.75);
 }
 .finance-type-toggle {
   display: flex;
@@ -1343,7 +1348,7 @@ a {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   flex: 1;
   min-width: 0;
 }

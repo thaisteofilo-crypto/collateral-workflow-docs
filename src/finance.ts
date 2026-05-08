@@ -61,6 +61,7 @@ export type Tag = {
 export type SubtypeMeta = {
   id: FinanceSubtype;
   label: string;
+  shortLabel: string;
   pluralLabel: string;
   color: string;
   expense: boolean;
@@ -71,6 +72,7 @@ export const SUBTYPES: SubtypeMeta[] = [
   {
     id: "ganho",
     label: "Ganho",
+    shortLabel: "Ganho",
     pluralLabel: "Ganhos",
     color: "#10B981",
     expense: false,
@@ -79,6 +81,7 @@ export const SUBTYPES: SubtypeMeta[] = [
   {
     id: "fixa",
     label: "Despesa Fixa",
+    shortLabel: "Fixa",
     pluralLabel: "Despesas Fixas",
     color: "#F87C56",
     expense: true,
@@ -87,6 +90,7 @@ export const SUBTYPES: SubtypeMeta[] = [
   {
     id: "variavel",
     label: "Despesa Variável",
+    shortLabel: "Variável",
     pluralLabel: "Despesas Variáveis",
     color: "#D6A461",
     expense: true,
@@ -95,6 +99,7 @@ export const SUBTYPES: SubtypeMeta[] = [
   {
     id: "divida",
     label: "Dívida",
+    shortLabel: "Dívida",
     pluralLabel: "Dívidas",
     color: "#EC4899",
     expense: true,
@@ -103,6 +108,7 @@ export const SUBTYPES: SubtypeMeta[] = [
   {
     id: "investimento",
     label: "Investimento",
+    shortLabel: "Aporte",
     pluralLabel: "Investimentos",
     color: "#A78BFA",
     expense: false,
@@ -136,9 +142,22 @@ export const CATEGORIES: CategoryDef[] = [
   { id: "outros", label: "Outros", color: "#9CA3AF" },
 ];
 
+export const INCOME_CATEGORIES: CategoryDef[] = [
+  { id: "salario", label: "Salário", color: "#10B981" },
+  { id: "freelance", label: "Freelance", color: "#06B6D4" },
+  { id: "bonus", label: "Bônus", color: "#34D399" },
+  { id: "reembolso", label: "Reembolso", color: "#A78BFA" },
+  { id: "venda", label: "Venda", color: "#FBBF24" },
+  { id: "rendimento", label: "Rendimento", color: "#818CF8" },
+  { id: "outros-income", label: "Outros", color: "#9CA3AF" },
+];
+
 export function getCategory(id: string | undefined): CategoryDef | undefined {
   if (!id) return undefined;
-  return CATEGORIES.find((c) => c.id === id);
+  return (
+    CATEGORIES.find((c) => c.id === id) ??
+    INCOME_CATEGORIES.find((c) => c.id === id)
+  );
 }
 
 export function categoryColor(id: string | undefined): string {

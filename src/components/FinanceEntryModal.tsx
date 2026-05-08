@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   BROKERS,
   CATEGORIES,
+  INCOME_CATEGORIES,
   INVESTMENT_TYPES,
   PAYMENT_METHODS,
   SUBTYPES,
@@ -81,9 +82,10 @@ export function FinanceEntryModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const showCategory = subtype === "fixa" || subtype === "variavel";
-  const showStatus = subtype === "fixa" || subtype === "variavel";
-  const showReceived = subtype === "ganho";
+  const showCategory =
+    subtype === "fixa" || subtype === "variavel" || subtype === "ganho";
+  const showStatus =
+    subtype === "fixa" || subtype === "variavel" || subtype === "ganho";
   const showPayment = subtype === "fixa";
   const showReceipt = subtype === "fixa";
   const showCard = subtype === "variavel";
@@ -92,6 +94,10 @@ export function FinanceEntryModal({
   const showTotalAmount = subtype === "divida";
   const showBroker = subtype === "investimento";
   const showInvestmentType = subtype === "investimento";
+
+  const categoryList =
+    subtype === "ganho" ? INCOME_CATEGORIES : CATEGORIES;
+  const isIncome = subtype === "ganho";
 
   const amountLabel =
     subtype === "variavel" || subtype === "divida"
@@ -114,7 +120,6 @@ export function FinanceEntryModal({
       tag: tag || undefined,
     };
     if (showStatus) entry.status = status;
-    if (showReceived) entry.status = status;
     if (showCategory && category) entry.category = category;
     if (showPayment && paymentMethod) entry.paymentMethod = paymentMethod;
     if (showReceipt && receiptUrl.trim())
@@ -142,7 +147,12 @@ export function FinanceEntryModal({
           <span className="day-modal-eyebrow">
             {isEdit ? "Editar lançamento" : "Novo lançamento"}
           </span>
-          <span className="day-modal-title">
+          <span
+            className="day-modal-title"
+            style={{
+              color: SUBTYPES.find((s) => s.id === subtype)?.color,
+            }}
+          >
             {SUBTYPES.find((s) => s.id === subtype)?.label}
           </span>
         </header>
@@ -168,7 +178,7 @@ export function FinanceEntryModal({
               disabled={isEdit}
               title={isEdit ? "O tipo não pode ser alterado depois" : undefined}
             >
-              {s.label}
+              {s.shortLabel}
             </button>
           ))}
         </div>
@@ -288,7 +298,7 @@ export function FinanceEntryModal({
           <div className="finance-field">
             <label className="finance-field-label">Categoria</label>
             <div className="finance-category-grid">
-              {CATEGORIES.map((c) => (
+              {categoryList.map((c) => (
                 <button
                   key={c.id}
                   type="button"
@@ -327,14 +337,14 @@ export function FinanceEntryModal({
                 className={`finance-status-button${status === "a_pagar" ? " is-active is-pending" : ""}`}
                 onClick={() => setStatus("a_pagar")}
               >
-                A pagar
+                {isIncome ? "A receber" : "A pagar"}
               </button>
               <button
                 type="button"
                 className={`finance-status-button${status === "pago" ? " is-active is-paid" : ""}`}
                 onClick={() => setStatus("pago")}
               >
-                Pago
+                {isIncome ? "Recebido" : "Pago"}
               </button>
             </div>
           </div>
@@ -464,18 +474,6 @@ export function FinanceEntryModal({
               ))}
             </div>
           </div>
-        )}
-
-        {/* Já recebida (ganho) */}
-        {showReceived && (
-          <label className="finance-checkbox">
-            <input
-              type="checkbox"
-              checked={status === "pago"}
-              onChange={(e) => setStatus(e.target.checked ? "pago" : "a_pagar")}
-            />
-            <span>Já recebida</span>
-          </label>
         )}
 
         <div className="day-modal-actions">
