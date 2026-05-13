@@ -901,7 +901,7 @@ export function WorkCalendar({
           <span>
             {readOnly
               ? "Visualização somente leitura — troque o perfil para editar este calendário."
-              : "Clique em um dia para registrar capas, internas, resumos e ajustes. Meses passados ficam travados — destrave o modo admin para corrigir."}
+              : "Clique em um dia para registrar capas, internas, resumos, ajustes, copy e localização da imagem no blog. Meses passados ficam travados — destrave o modo admin para corrigir."}
           </span>
           <span
             style={{
