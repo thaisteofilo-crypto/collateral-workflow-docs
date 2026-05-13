@@ -37,6 +37,8 @@ type DayEntry = {
   internas: number;
   resumos: number;
   ajustes: number;
+  copy: number;
+  imagemBlog: number;
 };
 
 const ZERO_ENTRY: DayEntry = {
@@ -44,6 +46,8 @@ const ZERO_ENTRY: DayEntry = {
   internas: 0,
   resumos: 0,
   ajustes: 0,
+  copy: 0,
+  imagemBlog: 0,
 };
 
 const LEGACY_ENTRY: DayEntry = {
@@ -51,6 +55,8 @@ const LEGACY_ENTRY: DayEntry = {
   internas: 0,
   resumos: 0,
   ajustes: 0,
+  copy: 0,
+  imagemBlog: 0,
 };
 
 const ENTRY_FIELDS: Array<{ key: keyof DayEntry; label: string }> = [
@@ -58,10 +64,14 @@ const ENTRY_FIELDS: Array<{ key: keyof DayEntry; label: string }> = [
   { key: "internas", label: "Capas internas" },
   { key: "resumos", label: "Resumos" },
   { key: "ajustes", label: "Ajustes" },
+  { key: "copy", label: "Copy" },
+  { key: "imagemBlog", label: "Localização da imagem" },
 ];
 
 function entryTotal(e: DayEntry): number {
-  return e.capas + e.internas + e.resumos + e.ajustes;
+  return (
+    e.capas + e.internas + e.resumos + e.ajustes + e.copy + e.imagemBlog
+  );
 }
 
 function isEntryEmpty(e: DayEntry): boolean {
@@ -130,6 +140,8 @@ function normalizeEntry(raw: unknown): DayEntry {
     internas: num(r.internas),
     resumos: num(r.resumos),
     ajustes: num(r.ajustes),
+    copy: num(r.copy),
+    imagemBlog: num(r.imagemBlog),
   };
 }
 
@@ -627,6 +639,8 @@ export function WorkCalendar({
       acc.internas += e.internas;
       acc.resumos += e.resumos;
       acc.ajustes += e.ajustes;
+      acc.copy += e.copy;
+      acc.imagemBlog += e.imagemBlog;
     }
     return acc;
   }, [workdays]);
@@ -747,12 +761,16 @@ export function WorkCalendar({
         internas: 0,
         resumos: 0,
         ajustes: 0,
+        copy: 0,
+        imagemBlog: 0,
       };
       acc.days += 1;
       acc.capas += entry.capas;
       acc.internas += entry.internas;
       acc.resumos += entry.resumos;
       acc.ajustes += entry.ajustes;
+      acc.copy += entry.copy;
+      acc.imagemBlog += entry.imagemBlog;
       map.set(monthKey, acc);
     }
     return Array.from(map.entries())
@@ -771,6 +789,8 @@ export function WorkCalendar({
           internas: acc.internas,
           resumos: acc.resumos,
           ajustes: acc.ajustes,
+          copy: acc.copy,
+          imagemBlog: acc.imagemBlog,
           earnings: acc.days * DAILY_RATE,
           paid: paidMonths.has(key),
         };
@@ -1034,7 +1054,13 @@ export function WorkCalendar({
               const isCurrent =
                 m.year === viewYear && m.month === viewMonth;
               const hasItemsRow =
-                m.capas + m.internas + m.resumos + m.ajustes > 0;
+                m.capas +
+                  m.internas +
+                  m.resumos +
+                  m.ajustes +
+                  m.copy +
+                  m.imagemBlog >
+                0;
               return (
                 <div
                   key={m.key}
@@ -1054,7 +1080,7 @@ export function WorkCalendar({
                     <span className="month-row-days">
                       {m.days} {m.days === 1 ? "dia" : "dias"}
                       {hasItemsRow
-                        ? ` · ${m.capas} cap · ${m.internas} int · ${m.resumos} res · ${m.ajustes} aj`
+                        ? ` · ${m.capas} cap · ${m.internas} int · ${m.resumos} res · ${m.ajustes} aj · ${m.copy} cop · ${m.imagemBlog} img`
                         : ""}
                     </span>
                   </button>

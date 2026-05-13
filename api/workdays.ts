@@ -32,15 +32,26 @@ type DayEntry = {
   internas: number;
   resumos: number;
   ajustes: number;
+  copy: number;
+  imagemBlog: number;
 };
 
-const ZERO: DayEntry = { capas: 0, internas: 0, resumos: 0, ajustes: 0 };
+const ZERO: DayEntry = {
+  capas: 0,
+  internas: 0,
+  resumos: 0,
+  ajustes: 0,
+  copy: 0,
+  imagemBlog: 0,
+};
 // Dias antigos não tinham tipo — assume 2 capas/dia (regra original).
 const LEGACY_DEFAULT: DayEntry = {
   capas: 2,
   internas: 0,
   resumos: 0,
   ajustes: 0,
+  copy: 0,
+  imagemBlog: 0,
 };
 
 function getRedis() {
@@ -78,12 +89,19 @@ function normalize(raw: unknown): DayEntry {
     internas: num(obj.internas),
     resumos: num(obj.resumos),
     ajustes: num(obj.ajustes),
+    copy: num(obj.copy),
+    imagemBlog: num(obj.imagemBlog),
   };
 }
 
 function isEmpty(e: DayEntry): boolean {
   return (
-    e.capas === 0 && e.internas === 0 && e.resumos === 0 && e.ajustes === 0
+    e.capas === 0 &&
+    e.internas === 0 &&
+    e.resumos === 0 &&
+    e.ajustes === 0 &&
+    e.copy === 0 &&
+    e.imagemBlog === 0
   );
 }
 

@@ -104,7 +104,7 @@ export const ROUTES: RouteDef[] = [
     title: "Calendário · Thais",
     shortLabel: "Calendário · Thais",
     subtitle:
-      "Registro de tarefas por dia: capas, capas internas, resumos e ajustes.",
+      "Registro de tarefas por dia: capas, capas internas, resumos, ajustes, copy e localização da imagem no blog.",
     category: "trabalho",
   },
   {
