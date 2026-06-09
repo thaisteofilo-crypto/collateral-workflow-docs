@@ -370,9 +370,9 @@ export function normalizeEntry(raw: unknown): FinanceEntry | null {
   const broker = typeof r.broker === "string" ? r.broker : undefined;
   const investmentType =
     typeof r.investmentType === "string" ? r.investmentType : undefined;
-  const auto = r.auto === true;
-  const autoSource =
-    typeof r.autoSource === "string" ? r.autoSource : undefined;
+  // Nunca aceita auto: true de dados do servidor — apenas generateCollateralAutoIncomes define isso.
+  const auto = false;
+  const autoSource = undefined;
 
   return {
     id: r.id,

@@ -30,7 +30,7 @@ const PERSON_STORAGE: Record<string, PersonStorage> = {
   },
 };
 
-const POLL_INTERVAL_MS = 5000;
+const POLL_INTERVAL_MS = 60_000;
 
 type DayEntry = {
   capas: number;
@@ -479,6 +479,11 @@ export function WorkCalendar({
   >("idle");
   const [isAdmin, setIsAdmin] = useState<boolean>(loadAdmin);
   const [editing, setEditing] = useState<EditingDay | null>(null);
+  const editingRef = useRef<EditingDay | null>(null);
+
+  useEffect(() => {
+    editingRef.current = editing;
+  }, [editing]);
 
   async function unlockAdmin() {
     const input = window.prompt("Senha admin:");
@@ -531,6 +536,7 @@ export function WorkCalendar({
 
     async function syncFromServer(initial: boolean) {
       if (pendingWrites.current > 0) return;
+      if (editingRef.current !== null) return;
       try {
         if (initial) setSyncStatus("syncing");
         const requests: [

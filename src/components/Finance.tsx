@@ -5,6 +5,7 @@ import {
 } from "@overlens/legacy-icons";
 import {
   type FinanceEntry,
+  type FinanceStatus,
   type FinanceSubtype,
   type Tag,
   brokerLabel,
@@ -28,7 +29,7 @@ import {
 } from "../finance";
 import { FinanceEntryModal } from "./FinanceEntryModal";
 
-const POLL_INTERVAL_MS = 5000;
+const POLL_INTERVAL_MS = 60_000;
 const ENTRIES_CACHE_KEY = "collateral.finance.entries.ane";
 const TAGS_CACHE_KEY = "collateral.finance.tags.ane";
 
@@ -230,6 +231,11 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
     "idle" | "syncing" | "online" | "offline"
   >("idle");
   const pendingWrites = useRef(0);
+  const editingRef = useRef<typeof editing>(null);
+
+  useEffect(() => {
+    editingRef.current = editing;
+  }, [editing]);
 
   useEffect(() => {
     saveEntriesCache(storedEntries);
@@ -245,6 +251,7 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
 
     async function syncFromServer(initial: boolean) {
       if (pendingWrites.current > 0) return;
+      if (editingRef.current !== null) return;
       try {
         if (initial) setSyncStatus("syncing");
         const [entries, calendar, tagsResp] = await Promise.all([
@@ -279,10 +286,13 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
     };
   }, []);
 
-  const allEntries = useMemo(
-    () => [...storedEntries, ...autoEntries],
-    [storedEntries, autoEntries]
-  );
+  const allEntries = useMemo(() => {
+    const storedIds = new Set(storedEntries.map((e) => e.id));
+    return [
+      ...storedEntries,
+      ...autoEntries.filter((a) => !storedIds.has(a.id)),
+    ];
+  }, [storedEntries, autoEntries]);
 
   const monthKey = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
   const entriesThisMonth = useMemo(
@@ -324,10 +334,10 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
   );
   const investimentos = useMemo(
     () =>
-      entriesBySubtype(allEntries, "investimento").sort((a, b) =>
+      entriesBySubtype(entriesThisMonth, "investimento").sort((a, b) =>
         b.date.localeCompare(a.date)
       ),
-    [allEntries]
+    [entriesThisMonth]
   );
 
   // Visão anual: somatório por mês do viewYear
@@ -361,8 +371,12 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
   }
 
   async function saveEntry(entry: FinanceEntry) {
-    setEditing(null);
     if (entry.auto) return;
+
+    // Incrementa ANTES de fechar o modal para que qualquer poll que acordar
+    // nesse instante já veja pendingWrites > 0 e não sobrescreva o estado.
+    pendingWrites.current += 1;
+    setEditing(null);
 
     const wasPresent = storedEntries.some((e) => e.id === entry.id);
     setStoredEntries((prev) => {
@@ -375,7 +389,6 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
       return [...prev, entry];
     });
 
-    pendingWrites.current += 1;
     setSyncStatus("syncing");
     try {
       const fresh = await postEntry(entry);
@@ -391,12 +404,19 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
     }
   }
 
+  async function toggleEntryStatus(entry: FinanceEntry) {
+    if (entry.auto) return;
+    const newStatus: FinanceStatus = entry.status === "pago" ? "a_pagar" : "pago";
+    await saveEntry({ ...entry, status: newStatus });
+  }
+
   async function removeEntry(id: string) {
+    pendingWrites.current += 1;
     setEditing(null);
+
     const removed = storedEntries.find((e) => e.id === id);
     setStoredEntries((prev) => prev.filter((e) => e.id !== id));
 
-    pendingWrites.current += 1;
     setSyncStatus("syncing");
     try {
       const fresh = await deleteEntry(id);
@@ -616,6 +636,7 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
           tags={tags}
           readOnly={readOnly}
           onEdit={(e) => setEditing({ entry: e })}
+          onStatusToggle={toggleEntryStatus}
         />
       )}
       {fixas.length > 0 && (
@@ -625,6 +646,7 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
           tags={tags}
           readOnly={readOnly}
           onEdit={(e) => setEditing({ entry: e })}
+          onStatusToggle={toggleEntryStatus}
         />
       )}
       {variaveis.length > 0 && (
@@ -634,6 +656,7 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
           tags={tags}
           readOnly={readOnly}
           onEdit={(e) => setEditing({ entry: e })}
+          onStatusToggle={toggleEntryStatus}
         />
       )}
       {dividas.length > 0 && (
@@ -643,6 +666,7 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
           tags={tags}
           readOnly={readOnly}
           onEdit={(e) => setEditing({ entry: e })}
+          onStatusToggle={toggleEntryStatus}
         />
       )}
       {investimentos.length > 0 && (
@@ -651,7 +675,6 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
           entries={investimentos}
           tags={tags}
           readOnly={readOnly}
-          showMonth
           onEdit={(e) => setEditing({ entry: e })}
         />
       )}
@@ -853,6 +876,7 @@ function FinanceSection({
   readOnly,
   showMonth,
   onEdit,
+  onStatusToggle,
 }: {
   subtype: FinanceSubtype;
   entries: FinanceEntry[];
@@ -860,6 +884,7 @@ function FinanceSection({
   readOnly: boolean;
   showMonth?: boolean;
   onEdit: (entry: FinanceEntry) => void;
+  onStatusToggle?: (entry: FinanceEntry) => void;
 }) {
   const meta = subtypeMeta(subtype);
   const tagSummary = useMemo(
@@ -915,6 +940,7 @@ function FinanceSection({
             tags={tags}
             showMonth={showMonth}
             onClick={readOnly || e.auto ? undefined : () => onEdit(e)}
+            onStatusToggle={!readOnly && !e.auto && onStatusToggle ? () => onStatusToggle(e) : undefined}
           />
         ))}
       </div>
@@ -929,11 +955,13 @@ function FinanceRow({
   tags,
   showMonth,
   onClick,
+  onStatusToggle,
 }: {
   entry: FinanceEntry;
   tags: Tag[];
   showMonth?: boolean;
   onClick?: () => void;
+  onStatusToggle?: () => void;
 }) {
   const tag = tags.find((t) => t.id === entry.tag);
   const meta = subtypeMeta(entry.subtype);
@@ -1012,11 +1040,20 @@ function FinanceRow({
             </span>
           )}
           {statusBadge && (
-            <span
-              className={`finance-row-status-badge ${statusBadge.className}`}
-            >
-              {statusBadge.label}
-            </span>
+            onStatusToggle ? (
+              <button
+                type="button"
+                className={`finance-row-status-badge ${statusBadge.className}`}
+                onClick={(ev) => { ev.stopPropagation(); onStatusToggle(); }}
+                title="Clique para alternar status de pagamento"
+              >
+                {statusBadge.label}
+              </button>
+            ) : (
+              <span className={`finance-row-status-badge ${statusBadge.className}`}>
+                {statusBadge.label}
+              </span>
+            )
           )}
           {entry.subtype === "fixa" && entry.receiptUrl && (
             <a

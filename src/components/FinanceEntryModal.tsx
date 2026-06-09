@@ -85,7 +85,7 @@ export function FinanceEntryModal({
   const showCategory =
     subtype === "fixa" || subtype === "variavel" || subtype === "ganho";
   const showStatus =
-    subtype === "fixa" || subtype === "variavel" || subtype === "ganho";
+    subtype === "fixa" || subtype === "variavel" || subtype === "ganho" || subtype === "divida";
   const showPayment = subtype === "fixa";
   const showReceipt = subtype === "fixa";
   const showCard = subtype === "variavel";

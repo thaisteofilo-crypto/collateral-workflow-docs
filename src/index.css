@@ -1293,6 +1293,14 @@ a {
   background: rgba(214, 164, 97, 0.1);
   color: #D6A461;
 }
+button.finance-row-status-badge {
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.12s;
+}
+button.finance-row-status-badge:hover {
+  opacity: 0.7;
+}
 
 /* ---- Tag chip in row ---- */
 .finance-row-tag {

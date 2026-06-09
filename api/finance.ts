@@ -174,6 +174,12 @@ export default async function handler(req: Request) {
         if (!entry) {
           return Response.json({ error: "bad request" }, { status: 400 });
         }
+        if (entry.id.startsWith("auto:")) {
+          return Response.json(
+            { error: "auto entries cannot be persisted" },
+            { status: 400 }
+          );
+        }
         await redis.hset(KEY, { [entry.id]: JSON.stringify(entry) });
       } else {
         return Response.json({ error: "bad request" }, { status: 400 });
