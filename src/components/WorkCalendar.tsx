@@ -602,8 +602,23 @@ export function WorkCalendar({
           }
         }
 
-        setWorkdays(workdayMap);
-        setPaidMonths(paidSet);
+        if (editingRef.current !== null) return;
+        setWorkdays((prev) => {
+          if (
+            prev.size === workdayMap.size &&
+            [...workdayMap.keys()].every((k) => prev.has(k))
+          )
+            return prev;
+          return workdayMap;
+        });
+        setPaidMonths((prev) => {
+          if (
+            prev.size === paidSet.size &&
+            [...paidSet].every((k) => prev.has(k))
+          )
+            return prev;
+          return paidSet;
+        });
         setSyncStatus("online");
       } catch (err) {
         if (cancelled) return;
@@ -699,7 +714,6 @@ export function WorkCalendar({
   }
 
   async function togglePaid(monthKey: string) {
-    if (readOnly) return;
     if (!isAdmin) return;
     const isPaid = paidMonths.has(monthKey);
     const action: "add" | "remove" = isPaid ? "remove" : "add";

@@ -267,11 +267,35 @@ export function Finance({
         ]);
         if (cancelled) return;
         if (pendingWrites.current > 0) return;
-        setStoredEntries(entries);
-        setAutoEntries(
-          generateCollateralAutoIncomes(calendar.workdays, calendar.paidMonths)
-        );
-        setTags(tagsResp);
+        if (editingRef.current !== null) return;
+        setStoredEntries((prev) => {
+          if (
+            prev.length === entries.length &&
+            prev.every((e, i) => e.id === entries[i].id && e.status === entries[i].status && e.amount === entries[i].amount)
+          )
+            return prev;
+          return entries;
+        });
+        setAutoEntries((prev) => {
+          const next = generateCollateralAutoIncomes(
+            calendar.workdays,
+            calendar.paidMonths
+          );
+          if (
+            prev.length === next.length &&
+            prev.every((e, i) => e.id === next[i].id && e.status === next[i].status)
+          )
+            return prev;
+          return next;
+        });
+        setTags((prev) => {
+          if (
+            prev.length === tagsResp.length &&
+            prev.every((t, i) => t.id === tagsResp[i].id && t.color === tagsResp[i].color)
+          )
+            return prev;
+          return tagsResp;
+        });
         setSyncStatus("online");
       } catch (err) {
         if (cancelled) return;
