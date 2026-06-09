@@ -212,7 +212,13 @@ const MONTHS_FULL = [
   "Dezembro",
 ];
 
-export function Finance({ readOnly = false }: { readOnly?: boolean }) {
+export function Finance({
+  readOnly = false,
+  canToggleStatus = false,
+}: {
+  readOnly?: boolean;
+  canToggleStatus?: boolean;
+}) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -636,7 +642,7 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
           tags={tags}
           readOnly={readOnly}
           onEdit={(e) => setEditing({ entry: e })}
-          onStatusToggle={toggleEntryStatus}
+          onStatusToggle={canToggleStatus ? toggleEntryStatus : undefined}
         />
       )}
       {fixas.length > 0 && (
@@ -646,7 +652,7 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
           tags={tags}
           readOnly={readOnly}
           onEdit={(e) => setEditing({ entry: e })}
-          onStatusToggle={toggleEntryStatus}
+          onStatusToggle={canToggleStatus ? toggleEntryStatus : undefined}
         />
       )}
       {variaveis.length > 0 && (
@@ -656,7 +662,7 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
           tags={tags}
           readOnly={readOnly}
           onEdit={(e) => setEditing({ entry: e })}
-          onStatusToggle={toggleEntryStatus}
+          onStatusToggle={canToggleStatus ? toggleEntryStatus : undefined}
         />
       )}
       {dividas.length > 0 && (
@@ -666,7 +672,7 @@ export function Finance({ readOnly = false }: { readOnly?: boolean }) {
           tags={tags}
           readOnly={readOnly}
           onEdit={(e) => setEditing({ entry: e })}
-          onStatusToggle={toggleEntryStatus}
+          onStatusToggle={canToggleStatus ? toggleEntryStatus : undefined}
         />
       )}
       {investimentos.length > 0 && (
@@ -940,7 +946,7 @@ function FinanceSection({
             tags={tags}
             showMonth={showMonth}
             onClick={readOnly || e.auto ? undefined : () => onEdit(e)}
-            onStatusToggle={!readOnly && !e.auto && onStatusToggle ? () => onStatusToggle(e) : undefined}
+            onStatusToggle={!e.auto && onStatusToggle ? () => onStatusToggle(e) : undefined}
           />
         ))}
       </div>

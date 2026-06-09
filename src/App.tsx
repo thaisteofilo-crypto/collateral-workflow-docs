@@ -82,7 +82,12 @@ function Page({ id, profile }: { id: string; profile: Profile }) {
       );
       break;
     case "financas":
-      body = <Finance readOnly={profile !== "ane"} />;
+      body = (
+        <Finance
+          readOnly={profile !== "ane"}
+          canToggleStatus={profile === "thais"}
+        />
+      );
       break;
   }
 

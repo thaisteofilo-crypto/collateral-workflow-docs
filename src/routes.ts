@@ -26,7 +26,7 @@ export const CATEGORIES: Category[] = [
   { id: "padroes", label: "Padrões" },
   { id: "assets", label: "Assets" },
   { id: "trabalho", label: "Trabalho" },
-  { id: "financeiro", label: "Financeiro", visibleFor: ["ane"] },
+  { id: "financeiro", label: "Financeiro", visibleFor: ["ane", "thais"] },
 ];
 
 export const ROUTES: RouteDef[] = [
@@ -114,7 +114,7 @@ export const ROUTES: RouteDef[] = [
     subtitle:
       "Entradas, saídas, categorias e saldo do mês. Privado — só você vê.",
     category: "financeiro",
-    visibleFor: ["ane"],
+    visibleFor: ["ane", "thais"],
   },
 ];
 
