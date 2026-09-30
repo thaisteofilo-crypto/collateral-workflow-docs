@@ -28,7 +28,7 @@ export type DebtActivity = {
   id: string;
   at: string; // ISO
   type: "criado" | "editado" | "apagado" | "pago";
-  by?: DebtActor;
+  by: DebtActor;
   paymentId: string;
   amount: number;
   date: string;
@@ -83,7 +83,9 @@ export function normalizeActivity(raw: unknown): DebtActivity | null {
     return null;
   if (typeof obj.paymentId !== "string" || typeof obj.amount !== "number")
     return null;
-  return obj as unknown as DebtActivity;
+  const a = obj as unknown as DebtActivity;
+  if (a.by !== "ane" && a.by !== "thais") a.by = LEGACY_ACTOR;
+  return a;
 }
 
 export type DebtWriteOp =
@@ -110,8 +112,11 @@ export function applyAction(
     id?: unknown;
     by?: unknown;
   };
-  const by: DebtActor | undefined =
-    b.by === "ane" || b.by === "thais" ? b.by : undefined;
+  // Toda ação precisa de um responsável.
+  if (b.by !== "ane" && b.by !== "thais") {
+    return { ok: false, status: 400, error: "Responsável não informado." };
+  }
+  const by: DebtActor = b.by;
   const at = now();
   const bad = { ok: false as const, status: 400, error: "bad request" };
   const locked = { ok: false as const, status: 423, error: LOCKED_MESSAGE };
@@ -130,8 +135,8 @@ export function applyAction(
       amount: p.amount,
       date: p.date,
       method: p.method,
+      by,
     };
-    if (by) a.by = by;
     if (prev) a.prev = { amount: prev.amount, date: prev.date, method: prev.method };
     return a;
   };
@@ -169,6 +174,9 @@ export function applyAction(
   return bad;
 }
 
+// Responsável pelos pagamentos feitos antes de o histórico existir.
+const LEGACY_ACTOR: DebtActor = "thais";
+
 // Pagamentos anteriores ao histórico não têm eventos gravados. Gera "registrou"
 // (hora tirada do id p_<timestamp base36>_...) e "marcou como pago" (paidAt)
 // para eles, sem gravar nada. Lista final em ordem do mais recente.
@@ -191,6 +199,7 @@ export function withBackfill(
       amount: p.amount,
       date: p.date,
       method: p.method,
+      by: LEGACY_ACTOR,
     };
     extra.push({ id: `legacy-criado-${p.id}`, at: createdAt, type: "criado", ...base });
     if (p.status === "pago") {

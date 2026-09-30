@@ -147,7 +147,7 @@ type Activity = {
   id: string;
   at: string;
   type: "criado" | "editado" | "apagado" | "pago";
-  by?: "ane" | "thais";
+  by: "ane" | "thais";
   paymentId: string;
   amount: number;
   date: string;
@@ -607,13 +607,7 @@ function ActivityLog({ activity }: { activity: Activity[] }) {
                 <span className="debt-activity-dot" aria-hidden />
                 <div className="debt-activity-main">
                   <span className="debt-activity-text">
-                    {a.by ? (
-                      <>
-                        <strong>{ACTOR_LABELS[a.by]}</strong> {verb}{" "}
-                      </>
-                    ) : (
-                      <>{verb.charAt(0).toUpperCase() + verb.slice(1)} </>
-                    )}
+                    <strong>{ACTOR_LABELS[a.by]}</strong> {verb}{" "}
                     {brl(a.amount)} · {fmtDate(a.date)} · {methodLabel(a.method)}
                   </span>
                   {changes && (
