@@ -168,3 +168,40 @@ export function applyAction(
 
   return bad;
 }
+
+// Pagamentos anteriores ao histórico não têm eventos gravados. Gera "registrou"
+// (hora tirada do id p_<timestamp base36>_...) e "marcou como pago" (paidAt)
+// para eles, sem gravar nada. Lista final em ordem do mais recente.
+export function withBackfill(
+  activity: DebtActivity[],
+  payments: DebtPayment[]
+): DebtActivity[] {
+  const known = new Set(activity.map((a) => a.paymentId));
+  const extra: DebtActivity[] = [];
+  for (const p of payments) {
+    if (known.has(p.id)) continue;
+    const m = /^p_([0-9a-z]+)_/.exec(p.id);
+    const created = m ? new Date(parseInt(m[1], 36)) : null;
+    const createdAt =
+      created && !Number.isNaN(created.getTime())
+        ? created.toISOString()
+        : p.paidAt ?? `${p.date}T12:00:00.000Z`;
+    const base = {
+      paymentId: p.id,
+      amount: p.amount,
+      date: p.date,
+      method: p.method,
+    };
+    extra.push({ id: `legacy-criado-${p.id}`, at: createdAt, type: "criado", ...base });
+    if (p.status === "pago") {
+      extra.push({
+        id: `legacy-pago-${p.id}`,
+        at: p.paidAt ?? createdAt,
+        type: "pago",
+        ...base,
+      });
+    }
+  }
+  if (extra.length === 0) return activity;
+  return [...activity, ...extra].sort((a, b) => b.at.localeCompare(a.at));
+}

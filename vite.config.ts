@@ -8,6 +8,7 @@ import {
   applyAction,
   normalizeActivity,
   normalizePayment,
+  withBackfill,
   type DebtActivity,
   type DebtPayment,
 } from "./api/_debt-core";
@@ -61,7 +62,7 @@ function debtDevApi(): Plugin {
         };
 
         if (req.method === "GET") {
-          return send(200, new URLSearchParams(query).has("activity") ? loadActivity() : load());
+          return send(200, new URLSearchParams(query).has("activity") ? withBackfill(loadActivity(), load()) : load());
         }
         if (req.method !== "POST") return send(405, { error: "method not allowed" });
 
