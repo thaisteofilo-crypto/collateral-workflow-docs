@@ -607,7 +607,13 @@ function ActivityLog({ activity }: { activity: Activity[] }) {
                 <span className="debt-activity-dot" aria-hidden />
                 <div className="debt-activity-main">
                   <span className="debt-activity-text">
-                    <strong>{a.by ? ACTOR_LABELS[a.by] : "Alguém"}</strong> {verb}{" "}
+                    {a.by ? (
+                      <>
+                        <strong>{ACTOR_LABELS[a.by]}</strong> {verb}{" "}
+                      </>
+                    ) : (
+                      <>{verb.charAt(0).toUpperCase() + verb.slice(1)} </>
+                    )}
                     {brl(a.amount)} · {fmtDate(a.date)} · {methodLabel(a.method)}
                   </span>
                   {changes && (

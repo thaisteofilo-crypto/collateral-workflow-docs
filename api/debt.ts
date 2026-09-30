@@ -3,6 +3,7 @@ import {
   applyAction,
   normalizeActivity,
   normalizePayment,
+  withBackfill,
   type DebtActivity,
   type DebtPayment,
 } from "./_debt-core";
@@ -52,7 +53,13 @@ export default async function handler(req: Request) {
 
     if (req.method === "GET") {
       if (new URL(req.url).searchParams.has("activity")) {
-        return Response.json(await readActivity(redis), { headers: noStore });
+        const [activity, payments] = await Promise.all([
+          readActivity(redis),
+          readAll(redis),
+        ]);
+        return Response.json(withBackfill(activity, payments), {
+          headers: noStore,
+        });
       }
       return Response.json(await readAll(redis), { headers: noStore });
     }
