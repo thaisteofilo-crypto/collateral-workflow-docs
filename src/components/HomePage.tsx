@@ -4,6 +4,7 @@ import {
   DocLineIcon,
   BoltSolidIcon,
   CalendarSolidIcon,
+  ChartLineIcon,
 } from "@overlens/legacy-icons";
 import type { ReactNode } from "react";
 import { CATEGORIES, ROUTES } from "../routes";
@@ -11,6 +12,7 @@ import { PageHeader } from "./PageHeader";
 
 interface CardSpec {
   catId: string;
+  title?: string;
   icon: ReactNode;
   color: string;
   bg: string;
@@ -53,6 +55,14 @@ const cardSpecs: CardSpec[] = [
     bg: "rgba(181, 150, 229, 0.12)",
     border: "rgba(181, 150, 229, 0.3)",
   },
+  {
+    catId: "financeiro",
+    title: "Quitação de Dívida",
+    icon: <ChartLineIcon style={{ width: 20, height: 20 }} />,
+    color: "#EF4444",
+    bg: "rgba(239, 68, 68, 0.12)",
+    border: "rgba(239, 68, 68, 0.3)",
+  },
 ];
 
 interface HomePageProps {
@@ -92,7 +102,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
                 {spec.icon}
               </span>
               <span className="home-card-text">
-                <span className="home-card-title">{cat.label}</span>
+                <span className="home-card-title">{spec.title ?? cat.label}</span>
                 <span className="home-card-meta">
                   {items.length} {items.length === 1 ? "página" : "páginas"}
                 </span>

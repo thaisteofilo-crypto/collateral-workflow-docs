@@ -9,8 +9,8 @@ import {
 
 export const config = { runtime: "edge" };
 
-const KEY = "collateral:debt:payments:ane";
-const ACTIVITY_KEY = "collateral:debt:activity:ane";
+const KEY = "collateral:debt:payments:v1";
+const ACTIVITY_KEY = "collateral:debt:activity:v1";
 const ACTIVITY_MAX = 500;
 
 function getRedis() {
@@ -30,8 +30,8 @@ async function readAll(redis: Redis): Promise<DebtPayment[]> {
   const raw = (await redis.hgetall(KEY)) as Record<string, unknown> | null;
   if (!raw) return [];
   const out: DebtPayment[] = [];
-  for (const val of Object.values(raw)) {
-    const n = normalizePayment(val);
+  for (const v of Object.values(raw)) {
+    const n = normalizePayment(v);
     if (n) out.push(n);
   }
   return out;
@@ -48,9 +48,6 @@ const noStore = { "cache-control": "no-store" };
 
 export default async function handler(req: Request) {
   try {
-    if (req.method !== "GET" && req.method !== "POST") {
-      return Response.json({ error: "method not allowed" }, { status: 405 });
-    }
     const redis = getRedis();
 
     if (req.method === "GET") {
@@ -60,27 +57,32 @@ export default async function handler(req: Request) {
       return Response.json(await readAll(redis), { headers: noStore });
     }
 
-    let body: unknown;
-    try {
-      body = await req.json();
-    } catch {
-      return Response.json({ error: "bad request" }, { status: 400 });
+    if (req.method === "POST") {
+      let body: unknown;
+      try {
+        body = await req.json();
+      } catch {
+        return Response.json({ error: "bad request" }, { status: 400 });
+      }
+      const result = applyAction(await readAll(redis), body);
+      if (!result.ok) {
+        return Response.json({ error: result.error }, { status: result.status });
+      }
+      if (result.op.type === "set") {
+        await redis.hset(KEY, {
+          [result.op.payment.id]: JSON.stringify(result.op.payment),
+        });
+      } else {
+        await redis.hdel(KEY, result.op.id);
+      }
+      if (result.activity) {
+        await redis.lpush(ACTIVITY_KEY, JSON.stringify(result.activity));
+        await redis.ltrim(ACTIVITY_KEY, 0, ACTIVITY_MAX - 1);
+      }
+      return Response.json(await readAll(redis), { headers: noStore });
     }
-    const result = applyAction(await readAll(redis), body);
-    if (!result.ok) {
-      return Response.json({ error: result.error }, { status: result.status });
-    }
-    const { op } = result;
-    if (op.type === "set") {
-      await redis.hset(KEY, { [op.payment.id]: JSON.stringify(op.payment) });
-    } else if (op.type === "del") {
-      await redis.hdel(KEY, op.id);
-    }
-    if (result.activity) {
-      await redis.lpush(ACTIVITY_KEY, JSON.stringify(result.activity));
-      await redis.ltrim(ACTIVITY_KEY, 0, ACTIVITY_MAX - 1);
-    }
-    return Response.json(await readAll(redis), { headers: noStore });
+
+    return Response.json({ error: "method not allowed" }, { status: 405 });
   } catch (err) {
     return Response.json(
       { error: err instanceof Error ? err.message : String(err) },

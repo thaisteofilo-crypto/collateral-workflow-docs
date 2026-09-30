@@ -73,7 +73,7 @@ function Page({ id, profile }: { id: string; profile: Profile }) {
       );
       break;
     case "financas":
-      body = <DebtPayoff canMarkPaid={profile === "thais"} actor={profile} />;
+      body = <DebtPayoff canEdit={profile === "ane" || profile === "thais"} profile={profile} />;
       break;
   }
 
