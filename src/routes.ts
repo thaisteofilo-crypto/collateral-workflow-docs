@@ -100,19 +100,11 @@ export const ROUTES: RouteDef[] = [
     category: "trabalho",
   },
   {
-    id: "calendario-thais",
-    title: "Calendário · Thais",
-    shortLabel: "Calendário · Thais",
-    subtitle:
-      "Registro de tarefas por dia: capas, capas internas, resumos, ajustes, copy e localização da imagem no blog.",
-    category: "trabalho",
-  },
-  {
     id: "financas",
-    title: "Finanças Pessoais",
-    shortLabel: "Finanças",
+    title: "Quitação de Dívida",
+    shortLabel: "Quitação de Dívida",
     subtitle:
-      "Entradas, saídas, categorias e saldo do mês. Privado — só você vê.",
+      "Pagamentos da dívida de R$ 11.800, com saldo restante atualizado.",
     category: "financeiro",
     visibleFor: ["ane", "thais"],
   },
