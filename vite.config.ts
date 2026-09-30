@@ -75,14 +75,20 @@ function debtDevApi(): Plugin {
             } catch {
               return send(400, { error: "bad request" });
             }
-            const result = applyAction(load(), body);
+            const current = load();
+            const result = applyAction(current, body);
             if (!result.ok) return send(result.status, { error: result.error });
-            if (result.op.type !== "none") save(result.next);
+            const op = result.op;
+            const next =
+              op.type === "set"
+                ? [...current.filter((p) => p.id !== op.payment.id), op.payment]
+                : current.filter((p) => p.id !== op.id);
+            save(next);
             if (result.activity) {
               const log = [result.activity, ...loadActivity()].slice(0, 500);
               writeFileSync(activityFile, JSON.stringify(log, null, 2));
             }
-            send(200, result.next);
+            send(200, next);
           } catch (err) {
             send(500, { error: err instanceof Error ? err.message : String(err) });
           }
