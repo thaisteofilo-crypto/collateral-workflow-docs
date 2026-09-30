@@ -27,3 +27,6 @@ dist-ssr
 
 # Heavy assets — deployed via vercel CLI, not tracked in git
 public/templates/*.psd
+
+# Local dev API data (vite dev mock)
+.local-data/

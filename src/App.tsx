@@ -10,7 +10,7 @@ import { Templates, Fonts } from "./components/Assets";
 import { ReferenceGallery } from "./components/ReferenceGallery";
 import { Pipeline } from "./components/Pipeline";
 import { WorkCalendar } from "./components/WorkCalendar";
-import { Finance } from "./components/Finance";
+import { DebtPayoff } from "./components/DebtPayoff";
 import { PasswordGate } from "./components/PasswordGate";
 import { ProfileGate, type Profile } from "./components/ProfileGate";
 import { CATEGORIES, findRoute } from "./routes";
@@ -72,27 +72,12 @@ function Page({ id, profile }: { id: string; profile: Profile }) {
         />
       );
       break;
-    case "calendario-thais":
-      body = (
-        <WorkCalendar
-          personId="thais"
-          mode="tasks"
-          readOnly={profile !== "thais"}
-        />
-      );
-      break;
     case "financas":
-      body = (
-        <Finance
-          readOnly={profile !== "ane"}
-          canToggleStatus={profile === "thais"}
-        />
-      );
+      body = <DebtPayoff canMarkPaid={profile === "thais"} actor={profile} />;
       break;
   }
 
-  // Finanças renderiza seu próprio header pra acomodar o botão "+ Adicionar"
-  // alinhado à direita.
+  // Quitação de Dívida renderiza seu próprio header.
   const skipAutoHeader = id === "financas";
 
   return (
